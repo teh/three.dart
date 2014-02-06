@@ -1,173 +1,131 @@
 part of three;
 
 class MorphAnimMesh extends Mesh {
-  num duration;
-  bool mirroredLoop;
-  num time;
+  // API
+  int duration = 1000; // milliseconds
+  bool mirroredLoop = false;
+  int time = 0;
 
-  num lastKeyframe, currentKeyframe;
+  // internals
+  int _lastKeyframe = 0;
+  int _currentKeyframe = 0;
 
-  num direction;
-  bool directionBackwards;
+  int _direction = 1;
+  bool _directionBackwards = false;
+  int _startKeyframe, _endKeyframe, _length;
 
-  num _startKeyframe, _endKeyframe, _length;
-
-  MorphAnimMesh(Geometry geometry, Material material)
-      : duration = 1000, // milliseconds
-        mirroredLoop = false,
-        time = 0,
-
-        lastKeyframe = 0,
-        currentKeyframe = 0,
-
-        direction = 1,
-        directionBackwards = false,
-
-        super(geometry, material) {
-
-        setFrameRange( 0, geometry.morphTargets.length - 1 );
+  MorphAnimMesh(Geometry geometry, Material material) : super(geometry, material) {
+    setFrameRange(0, geometry.morphTargets.length - 1);
   }
 
-  setFrameRange( start, end ) {
+  void setFrameRange(int start, int end) {
     _startKeyframe = start;
     _endKeyframe = end;
 
     _length = _endKeyframe - _startKeyframe + 1;
   }
 
-  setDirectionForward() {
-    direction = 1;
-    directionBackwards = false;
+  void setDirectionForward() {
+    _direction = 1;
+    _directionBackwards = false;
   }
 
-  setDirectionBackward() {
-    direction = -1;
-    directionBackwards = true;
+  void setDirectionBackward() {
+    _direction = -1;
+    _directionBackwards = true;
   }
 
-  parseAnimations() {
+  void parseAnimations() {
+    if (geometry.animations == null) geometry.animations = {};
 
-    if ( geometry["animations"] == null ) geometry["animations"] = {};
+    var firstAnimation, animations = geometry.animations;
 
-    var firstAnimation, animations = geometry["animations"];
+    RegExp pattern = new RegExp(r'([a-z]+)(\d+)');
 
-    RegExp pattern = new RegExp('''([a-z]+)(\d+)''');
+    for (var i = 0; i < geometry.morphTargets.length; i++) {
+      var morph = geometry.morphTargets[i];
+      var parts = pattern.allMatches(morph.name);
 
-    var il = geometry.morphTargets.length;
-    for ( var i = 0; i < il; i ++ ) {
+      if (parts.length > 1) {
+        var label = parts[1];
+        var num = parts[2];
 
-      var morph = geometry.morphTargets[ i ];
-      // TODO(aforsell) Is this really correct use of RegExp?
-      var parts = morph.name.allMatches( pattern.toString() ).toList();
+        if (!animations.containsKey(label)) { 
+          animations[label] = {"start": double.INFINITY, "end": double.NEGATIVE_INFINITY};
+        }
 
-      if ( parts && parts.length > 1 ) {
+        var animation = animations[label];
 
-        var label = parts[ 1 ];
-        var num = parts[ 2 ];
+        if (i < animation["start"]) animation["start"] = i;
+        if (i > animation["end"]) animation["end"] = i;
 
-        if ( ! animations[ label ] ) animations[ label ] = { "start": double.INFINITY, "end": double.NEGATIVE_INFINITY };
-
-        var animation = animations[ label ];
-
-        if ( i < animation.start ) animation.start = i;
-        if ( i > animation.end ) animation.end = i;
-
-        if ( ! firstAnimation ) firstAnimation = label;
-
+        if (geometry.firstAnimation == null) firstAnimation = label;
       }
-
     }
 
-    geometry["firstAnimation"] = firstAnimation;
-
+    geometry.firstAnimation = firstAnimation;
   }
 
-  setAnimationLabel( label, start, end ) {
-
-    if ( geometry["animations"] == null ) geometry["animations"] = {};
-
-    geometry["animations"][ label ] = { "start": start, "end": end };
-
+  void setAnimationLabel(String label, int start, int end) {
+    if (geometry.animations == null) geometry.animations = {};
+    geometry.animations[label] = {"start": start, "end": end};
   }
 
-  playAnimation( label, fps ) {
+  void playAnimation(String label, int fps) {
+    var animation = geometry.animations[label];
 
-    var animation = geometry["animations"][ label ];
-
-    if ( animation != null) {
-
-      setFrameRange( animation.start, animation.end );
-      duration = 1000 * ( ( animation.end - animation.start ) / fps );
+    if (animation != null) {
+      setFrameRange(animation["start"], animation["end"]);
+      duration = 1000 * ((animation["end"] - animation["start"]) / fps);
       time = 0;
-
     } else {
-
-      print( "animation[$label] undefined" );
-
+      print("animation[$label] undefined");
     }
-
   }
 
-  updateAnimation( delta ) {
-
+  void updateAnimation(int delta) {
     var frameTime = duration / _length;
 
-    time += direction * delta;
+    time += _direction * delta;
 
-    if ( mirroredLoop ) {
+    if (mirroredLoop) {
+      if (time > duration || time < 0) {
+        _direction *= -1;
 
-      if ( time > duration || time < 0 ) {
-
-        direction *= -1;
-
-        if ( time > duration ) {
-
+        if (time > duration) {
           time = duration;
-          directionBackwards = true;
-
+          _directionBackwards = true;
         }
 
-        if ( time < 0 ) {
-
+        if (time < 0) {
           time = 0;
-          directionBackwards = false;
-
+          _directionBackwards = false;
         }
-
       }
-
     } else {
-
       time = time % duration;
-
-      if ( time < 0 ) time += duration;
-
+      if (time < 0) time += duration;
     }
 
-    var keyframe = _startKeyframe + ThreeMath.clamp( ( time / frameTime ).floor(), 0, _length - 1 );
+    var keyframe = _startKeyframe + MathUtils.clamp((time / frameTime).floor(), 0, _length - 1);
 
-    if ( keyframe != currentKeyframe ) {
+    if (keyframe != _currentKeyframe) {
+      morphTargetInfluences[_lastKeyframe] = 0;
+      morphTargetInfluences[_currentKeyframe] = 1;
 
-      morphTargetInfluences[ lastKeyframe ] = 0;
-      morphTargetInfluences[ currentKeyframe ] = 1;
+      morphTargetInfluences[keyframe] = 0;
 
-      morphTargetInfluences[ keyframe ] = 0;
-
-      lastKeyframe = currentKeyframe;
-      currentKeyframe = keyframe;
-
+      _lastKeyframe = _currentKeyframe;
+      _currentKeyframe = keyframe;
     }
 
-    var mix = ( time % frameTime ) / frameTime;
+    var mix = (time % frameTime) / frameTime;
 
-    if ( directionBackwards ) {
-
+    if (_directionBackwards) {
       mix = 1 - mix;
-
     }
 
-    morphTargetInfluences[ currentKeyframe ] = mix;
-    morphTargetInfluences[ lastKeyframe ] = 1 - mix;
-
+    morphTargetInfluences[_currentKeyframe] = mix;
+    morphTargetInfluences[_lastKeyframe] = 1 - mix;
   }
 }

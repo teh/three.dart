@@ -1,34 +1,38 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  * @author mikael emtinger / http://gomo.se
  *
  * Ported to Dart from JS by:
  * @author rob silverton / http://www.unwrong.com/
+ * 
+ * based on r63
  */
 
-class Camera extends Object3D {
-  Matrix4 matrixWorldInverse;
-  Matrix4 projectionMatrix;
-  Matrix4 projectionMatrixInverse;
+part of three;
 
+class Camera extends Object3D {
+  Matrix4 matrixWorldInverse = new Matrix4.identity();
+  Matrix4 projectionMatrix = new Matrix4.identity();
+  Matrix4 projectionMatrixInverse = new Matrix4.identity();
+  
   double near;
   double far;
-
-  Camera(this.near, this.far)
-    : matrixWorldInverse = new Matrix4.identity(),
-      projectionMatrix = new Matrix4.identity(),
-      projectionMatrixInverse = new Matrix4.identity(),
-      super();
-
-  void lookAt(Vector3 vector ) {
-    // TODO: Add hierarchy support.
-
-    makeLookAt(matrix, position, vector, up);
-
-    if ( rotationAutoUpdate ) {
-      rotation = calcEulerFromRotationMatrix( matrix, eulerOrder );
-    }
+  
+  Camera([this.near, this.far]) : super();
+  
+  void lookAt(Vector3 vector) {
+    quaternion = new Quaternion.fromRotation(new Matrix3.lookAt(position, vector, up));
+  }
+  
+  Camera clone([Camera camera, bool recursive = false]) {
+    if (camera == null) camera = new Camera();
+    
+    super.clone(camera, recursive);
+    
+    camera.matrixWorldInverse.setFrom(matrixWorldInverse);
+    camera.projectionMatrix.setFrom(projectionMatrix);
+    camera.projectionMatrixInverse.setFrom(projectionMatrixInverse);
+    
+    return camera;
   }
 }

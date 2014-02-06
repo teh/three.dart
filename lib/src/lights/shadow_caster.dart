@@ -1,53 +1,31 @@
 part of three;
 
-class ShadowCaster extends Light {
-  bool castShadow;
-  bool onlyShadow;
+class ShadowCaster {
+  bool castShadow = false;
+  bool onlyShadow = false;
 
-  num shadowCameraNear,
-      shadowCameraFar,
-      shadowCameraFov;
+  double shadowCameraNear = 50.0;
+  double shadowCameraFar = 5000.0;
+  double shadowCameraFov;
+  
+  double shadowCameraLeft;
+  double shadowCameraRight;
+  double shadowCameraTop;
+  double shadowCameraBottom;
+  
+  bool shadowCameraVisible = false;
 
-  bool shadowCameraVisible;
+  double shadowBias = 0.0;
+  double shadowDarkness = 0.5;
 
-  num shadowBias;
-  num shadowDarkness;
+  int shadowMapWidth = 512;
+  int shadowMapHeight = 512;
+  
+  WebGLRenderTarget shadowMap;
+  Vector2 shadowMapSize;
+  Camera shadowCamera;
+  Matrix4 shadowMatrix;
 
-  num shadowMapWidth,
-      shadowMapHeight;
-
-  //
-  var shadowMap;
-  var shadowMapSize;
-  var shadowCamera;
-  var shadowMatrix;
-
-  var cameraHelper;
-
-  ShadowCaster(num hex) :
-    castShadow = false,
-    onlyShadow = false,
-
-    //
-
-    shadowCameraNear = 50,
-    shadowCameraFar = 5000,
-    shadowCameraFov = 50,
-
-    shadowCameraVisible = false,
-
-    shadowBias = 0,
-    shadowDarkness = 0.5,
-
-    shadowMapWidth = 512,
-    shadowMapHeight = 512,
-
-    //
-
-    shadowMap = null,
-    shadowMapSize = null,
-    shadowCamera = null,
-    shadowMatrix = null,
-    super(hex);
+  CameraHelper cameraHelper;
 }
 

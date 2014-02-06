@@ -1,94 +1,125 @@
+/*
+ * @author alteredq / http://alteredqualia.com/
+ *
+ * parameters = {
+ *  fragmentShader: <string>,
+ *  vertexShader: <string>,
+ *
+ *  uniforms: { "parameter1": { type: "f", value: 1.0 }, "parameter2": { type: "i" value2: 2 } },
+ *
+ *  defines: { "label" : "value" },
+ *
+ *  shading: THREE.SmoothShading,
+ *  blending: THREE.NormalBlending,
+ *  depthTest: <bool>,
+ *  depthWrite: <bool>,
+ *
+ *  wireframe: <boolean>,
+ *  wireframeLinewidth: <float>,
+ *
+ *  lights: <bool>,
+ *
+ *  vertexColors: THREE.NoColors / THREE.VertexColors / THREE.FaceColors,
+ *
+ *  skinning: <bool>,
+ *  morphTargets: <bool>,
+ *  morphNormals: <bool>,
+ *
+ *        fog: <bool>
+ * }
+ */
+
 part of three;
 
+/// Material rendered with custom shaders
 class ShaderMaterial extends Material {
-
   String fragmentShader;
   String vertexShader;
   Map<String, Uniform> uniforms;
-
-  //var attributes; - Moved to Material
+  Map<String, num> defines;
+  Map<String, Attribute> attributes;
 
   int shading;
+  
+  double lineWidth;
 
   bool wireframe;
-  num wireframeLinewidth;
-
+  double wireframeLinewidth;
+  
+  bool fog;
 
   bool lights; // set to use scene lights
+  
+  int vertexColors;
 
   bool skinning; // set to use skinning attribute streams
 
   bool morphTargets; // set to use morph targets
   bool morphNormals; // set to use morph normals
+  
+  ShaderMaterial({// ShaderMaterial
+                  this.attributes,
+                  this.fragmentShader: "void main() {}",
+                  this.vertexShader: "void main() {}",
+                  Map<String, Uniform> uniforms,
+                  Map<String, num> defines,
 
-  int vertexColors;
-  bool fog;
+                  this.shading: SMOOTH_SHADING,
 
-  Map<String, Attribute> attributes;
+                  this.vertexColors: NO_COLORS,
 
-  Map defines = {};
+                  this.fog: true,
 
-  ShaderMaterial( { // ShaderMaterial
-                    this.attributes,
-                    this.fragmentShader: "void main() {}",
-                    this.vertexShader: "void main() {}",
-                    Map uniforms,
+                  this.wireframe: false,
+                  this.wireframeLinewidth: 1.0,
 
-                    this.shading: SmoothShading,
+                  this.skinning: false,
+                  this.morphTargets: false,
+                  this.morphNormals: false,
 
-                    this.vertexColors: NoColors,
+                  // Material
+                  String name: '',
+                  int side: FRONT_SIDE,
 
-                    this.fog: true,
+                  double opacity: 1.0,
+                  bool transparent: false,
 
-                    this.wireframe: false,
-                    this.wireframeLinewidth: 1,
+                  int blending: NORMAL_BLENDING,
+                  int blendSrc: SRC_ALPHA_FACTOR,
+                  int blendDst: ONE_MINUS_SRC_ALPHA_FACTOR,
+                  int blendEquation: ADD_EQUATION,
 
-                    this.skinning: false,
-                    this.morphTargets: false,
-                    this.morphNormals: false,
+                  bool depthTest: true,
+                  bool depthWrite: true,
 
-                    // Material
-                    name: '',
-                    side: FrontSide,
+                  bool polygonOffset: false,
+                  int polygonOffsetFactor: 0,
+                  int polygonOffsetUnits:  0,
 
-                    opacity: 1,
-                    transparent: false,
+                  int alphaTest: 0,
 
-                    blending: NormalBlending,
-                    blendSrc: SrcAlphaFactor,
-                    blendDst: OneMinusSrcAlphaFactor,
-                    blendEquation: AddEquation,
+                  int overdraw: 0,
 
-                    depthTest: true,
-                    depthWrite: true,
-
-                    polygonOffset: false,
-                    polygonOffsetFactor: 0,
-                    polygonOffsetUnits:  0,
-
-                    alphaTest: 0,
-
-                    overdraw: false,
-
-                    visible: true,
-                    this.lights: false})
-                    : super(  name: name,
-                              side: side,
-                              opacity: opacity,
-                              transparent: transparent,
-                              blending: blending,
-                              blendSrc: blendSrc,
-                              blendDst: blendDst,
-                              blendEquation: blendEquation,
-                              depthTest: depthTest,
-                              depthWrite: depthWrite,
-                              polygonOffset: polygonOffset,
-                              polygonOffsetFactor: polygonOffsetFactor,
-                              polygonOffsetUnits: polygonOffsetUnits,
-                              alphaTest: alphaTest,
-                              overdraw: overdraw,
-                              visible: visible ) {
-                      this.uniforms = (uniforms != null) ? uniforms : {};
-                    }
-
+                  bool visible: true,
+                  this.lights: false})
+      : this.uniforms = uniforms != null ? uniforms : {},
+        this.defines = defines != null ? defines : {},
+        super(name: name,
+              side: side,
+              opacity: opacity,
+              transparent: transparent,
+              blending: blending,
+              blendSrc: blendSrc,
+              blendDst: blendDst,
+              blendEquation: blendEquation,
+              depthTest: depthTest,
+              depthWrite: depthWrite,
+              polygonOffset: polygonOffset,
+              polygonOffsetFactor: polygonOffsetFactor,
+              polygonOffsetUnits: polygonOffsetUnits,
+              alphaTest: alphaTest,
+              overdraw: overdraw,
+              visible: visible);
+  
+  //TODO Add clone.
 }

@@ -1,6 +1,4 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  * @author supereggbert / http://www.paulbrunt.co.uk/
  * @author julianwa / https://github.com/julianwa
@@ -9,310 +7,284 @@ part of three;
  * @author rob silverton / http://www.unwrong.com/
  * @author nelson silva / http://www.inevo.pt
  *
- * updated to 81ef5c3b32 - Made Projector.projectObject more open for custom rendererers.
+ * based on r65
  */
 
+part of three;
+
 class Projector {
-  List<RenderableObject>_objectPool;
-  List<RenderableVertex> _vertexPool;
-  List<RenderableFace4> _face4Pool;
-  List<RenderableFace3> _face3Pool;
-  List<RenderableLine> _linePool;
-  List<RenderableParticle> _particlePool;
-
-  int _objectCount, _vertexCount, _face3Count, _face4Count, _lineCount, _particleCount;
-
   RenderableObject _object;
   RenderableVertex _vertex;
+  RenderableFace3 _face;
   RenderableLine _line;
-  RenderableParticle _particle;
+  RenderableSprite _sprite;
+  
+  int _objectCount;
+  int _vertexCount;  
+  int _face3Count;  
+  int _lineCount;
+  int _spriteCount;
+    
+  List<RenderableObject> _objectPool = [];
+  List<RenderableVertex> _vertexPool = [];
+  List<RenderableFace3> _face3Pool = [];
+  List<RenderableLine> _linePool = [];
+  List<RenderableSprite> _spritePool = [];
+   
+  int _objectPoolLength = 0;
+  int _vertexPoolLength = 0;  
+  int _face3PoolLength = 0; 
+  int _linePoolLength = 0;
+  int _spritePoolLength = 0;
+  
+  ProjectorRenderData _renderData = new ProjectorRenderData();
 
-  Vector3 _vector3;
-  Vector4 _vector4;
+  Vector3 _vector3 = new Vector3.zero();
+  Vector4 _vector4 = new Vector4.identity();
+  
+  Box3 _clipBox = new Box3(new Vector3.minusOne(), new Vector3.one());
+  Box3 _boundingBox = new Box3();
+  List<Vector3> _points3 = new List<Vector3>(3);
+  List<Vector3> _points4 = new List<Vector3>(4);
+  
+  Matrix4 _viewMatrix = new Matrix4.identity();
+  Matrix4 _viewProjectionMatrix = new Matrix4.identity();
+  
+  Matrix4 _modelMatrix;
+  Matrix4 _modelViewProjectionMatrix = new Matrix4.identity();
+  
+  Matrix3 _normalMatrix = new Matrix3.identity();
+  Matrix3 _normalViewMatrix = new Matrix3.identity();
+  
+  Vector3 _centroid = new Vector3.zero();
+  
+  Frustum _frustum = new Frustum();
 
-  Vector4 _clippedVertex1PositionScreen;
-  Vector4 _clippedVertex2PositionScreen;
+  Vector4 _clippedVertex1PositionScreen = new Vector4.identity();
+  Vector4 _clippedVertex2PositionScreen = new Vector4.identity();
 
-  ProjectorRenderData _renderData;
-
-  Matrix4 _viewProjectionMatrix, _modelViewProjectionMatrix;
-
-  Frustum _frustum;
-
-  Projector()
-      : _objectPool = [],
-        _vertexPool = [],
-        _face3Pool = [],
-        _face4Pool = [],
-        _linePool = [],
-        _particlePool = [],
-
-        //_renderData = { "objects": [], "sprites": [], "lights": [], "elements": [] };
-        _renderData = new ProjectorRenderData(),
-
-        _vector3 = new Vector3.zero(),
-        _vector4 = new Vector4(0.0, 0.0, 0.0, 1.0),
-
-        _viewProjectionMatrix = new Matrix4.identity(),
-        _modelViewProjectionMatrix = new Matrix4.identity(),
-
-        _frustum = new Frustum(),
-
-        _clippedVertex1PositionScreen = new Vector4(0.0, 0.0, 0.0, 1.0),
-        _clippedVertex2PositionScreen = new Vector4(0.0, 0.0, 0.0, 1.0);
-
-  Vector3 projectVector( Vector3 vector, Camera camera ) {
+  /// Projects [vector] from object space into screen space.
+  Vector3 projectVector(Vector3 vector, Camera camera) {
     camera.matrixWorldInverse.copyInverse(camera.matrixWorld);
-
     _viewProjectionMatrix = camera.projectionMatrix * camera.matrixWorldInverse;
-
     return vector.applyProjection(_viewProjectionMatrix);
   }
 
-  Vector3 unprojectVector( Vector3 vector, Camera camera ) {
+  /// Converts [vector] from a screen space into world space.
+  Vector3 unprojectVector(Vector3 vector, Camera camera) {
     camera.projectionMatrixInverse.copyInverse(camera.projectionMatrix);
-
     _viewProjectionMatrix = camera.matrixWorld * camera.projectionMatrixInverse;
-
     return vector.applyProjection(_viewProjectionMatrix);
   }
 
-  /**
-   * Translates a 2D point from NDC to a THREE.Ray
-   * that can be used for picking.
-   * @vector - THREE.Vector3 that represents 2D point
-   * @camera - THREE.Camera
-   */
-  Ray pickingRay( Vector3 vector, Camera camera ) {
-    Vector3 end, ray, t;
-
+  /// Translates [vector] from NDC (Normalized Device Coordinates) 
+  /// to a [Raycaster] that can be used for picking. 
+  /// NDC range from [-1.0 .. 1.0] in x (left to right) and [1.0 .. -1.0] in y (top to bottom).
+  RayCaster pickingRay(Vector3 vector, Camera camera) {
     // set two vectors with opposing z values
     vector.z = -1.0;
-    end = new Vector3( vector.x, vector.y, 1.0 );
+    var end = new Vector3(vector.x, vector.y, 1.0);
 
-    unprojectVector( vector, camera );
-    unprojectVector( end, camera );
+    unprojectVector(vector, camera);
+    unprojectVector(end, camera);
 
     // find direction from vector to end
-    end.sub( vector ).normalize();
+    end.sub(vector).normalize();
 
-    return new Ray( vector, end );
+    return new RayCaster(vector, end);
   }
+  
+  RenderableObject _getObject(Object3D object) {
+    _object = getNextObjectInPool();
+    _object.id = object.id;
+    _object.object = object;
 
-  _projectObject( Object3D parent ) {
-    var cl = parent.children.length;
-    for ( var c = 0; c < cl; c ++ ) {
-
-      var object = parent.children[ c ];
-
-      if ( !object.visible ) continue;
-
-      if ( object is Light ) {
-
-        _renderData.lights.add( object );
-
-      } else if ( object is Mesh || object is Line ) {
-
-        if ( !object.frustumCulled || _frustum.contains( object ) ) {
-
-          _object = getNextObjectInPool();
-          _object.object = object;
-
-          if ( object.renderDepth != null ) {
-
-            _object.z = object.renderDepth;
-
-          } else {
-
-            _vector3 = object.matrixWorld.getTranslation();
-            _vector3.applyProjection(_viewProjectionMatrix);
-            _object.z = _vector3.z;
-
-          }
-
-          _renderData.objects.add( _object );
-
-        }
-
-      } else if ( object is Sprite || object is Particle ) {
-
-        _object = getNextObjectInPool();
-        _object.object = object;
-
-        // TODO: Find an elegant and performant solution and remove this dupe code.
-
-        if ( object.renderDepth != null ) {
-
-          _object.z = object.renderDepth;
-
-        } else {
-
-          _vector3 = object.matrixWorld.getTranslation();
-          _vector3.applyProjection(_viewProjectionMatrix);
-          _object.z = _vector3.z;
-
-        }
-
-        _renderData.sprites.add( _object );
-
-      } else {
-
-        _object = getNextObjectInPool();
-        _object.object = object;
-
-        if ( object.renderDepth != null ) {
-
-          _object.z = object.renderDepth;
-
-        } else {
-
-          _vector3 = object.matrixWorld.getTranslation();
-          _vector3.applyProjection(_viewProjectionMatrix);
-          _object.z = _vector3.z;
-
-        }
-
-        _renderData.objects.add( _object );
-
-      }
-
-      _projectObject( object );
+    if (object.renderDepth != null) {
+      _object.z = object.renderDepth;
+    } else {
+      _vector3 = object.matrixWorld.getTranslation();
+      _vector3.applyProjection(_viewProjectionMatrix);
+      _object.z = _vector3.z;
     }
+
+    return _object;
+  }
+  
+  void _projectVertex(RenderableVertex vertex) {
+    var position = vertex.position;
+    var positionWorld = vertex.positionWorld;
+    var positionScreen = vertex.positionScreen;
+   
+    positionWorld = new Vector3.copy(position)..applyMatrix4(_modelMatrix);
+    positionScreen = new Vector4.copy(positionWorld)..applyMatrix4(_viewProjectionMatrix);
+    
+    var invW = 1 / positionScreen.w;
+    
+    positionScreen.x *= invW;
+    positionScreen.y *= invW;
+    positionScreen.z *= invW;
+    
+    vertex.visible = positionScreen.x >= -1 && positionScreen.x <= 1 &&
+    positionScreen.y >= -1 && positionScreen.y <= 1 &&
+    positionScreen.z >= -1 && positionScreen.z <= 1;
   }
 
-  ProjectorRenderData projectGraph( Object3D root, bool sort ) {
+  void _projectObject(Object3D object) {
+    if (!object.visible) return;
+    
+    if (object is Light) {
+      _renderData.lights.add(object);
+    } else if (object is Mesh || object is Line) {
+      if (!object.frustumCulled || _frustum.intersectsObject(object)) {
+       _renderData.objects.add(_getObject(object)); 
+      }
+    } else if (object is Sprite) {
+      _renderData.sprites.add(_getObject(object));
+    }
+    
+    object.children.forEach((child) => _projectObject(child));
+  }
+  
+  void _projectGraph(Object3D root, [bool sortObjects = false]) {
     _objectCount = 0;
 
     _renderData.objects = [];
     _renderData.sprites = [];
     _renderData.lights = [];
 
-    _projectObject( root );
+    _projectObject(root);
 
-    //TODO: assuming this is a form of 'if' statement.
-    //sort && _renderData.objects.sort( painterSort );
-
-    if (sort) {
-      _renderData.objects.sort( painterSort );
+    if (sortObjects) {
+      _renderData.objects.sort(_painterSort);
     }
-
-    return _renderData;
   }
 
-
-  ProjectorRenderData projectScene( Scene scene, Camera camera, bool sort ) {
-    num near = camera.near, far = camera.far;
-    bool visible = false;
-    int o, ol, v, vl, f, fl, n, nl, c, cl, u, ul;
-    Object3D object;
-    Matrix4 modelMatrix, rotationMatrix;
-    Geometry geometry;
-    List geometryMaterials;
-    List<Vector3> vertices;
-    Vector3 vertex;
-    Vector3 vertexPositionScreen, normal;
-    List<Face> faces;
-    Face face;
-    RenderableFace _face;
-    List faceVertexNormals;
-    List<List> faceVertexUvs;
-    RenderableVertex v1, v2, v3, v4;
-    bool isFaceMaterial;
-    Material material;
-    int side;
-
+  /// Transforms a 3D scene object into 2D render data that can be 
+  /// rendered in a screen with your renderer of choice, projecting 
+  /// and clipping things out according to the used camera. 
+  /// 
+  /// If the scene were a real scene, this method would be the 
+  /// equivalent of taking a picture with the camera (and developing 
+  /// the film would be the next step, using a Renderer).
+  ProjectorRenderData projectScene(Scene scene, Camera camera, {bool sortObjects: false, bool sortElements: false}) {
+    var visible = false;
+    
     _face3Count = 0;
-    _face4Count = 0;
     _lineCount = 0;
-    _particleCount = 0;
-
+    _spriteCount = 0;
+    
     _renderData.elements = [];
+    
+    if (scene.autoUpdate) scene.updateMatrixWorld();
+    if (camera.parent == null) camera.updateMatrixWorld();
+    
+    _viewMatrix = camera.matrixWorldInverse..copyInverse(camera.matrixWorld);
+    _viewProjectionMatrix = camera.projectionMatrix - _viewMatrix;
 
-    scene.updateMatrixWorld();
+    _normalViewMatrix = _viewMatrix.getNormalMatrix();
 
-    if ( camera.parent == null ) {
-      // console.warn( 'DEPRECATED: Camera hasn\'t been added to a Scene. Adding it...' );
-      // scene.add( camera );
-      camera.updateMatrixWorld();
-    }
+    _frustum.setFromMatrix(_viewProjectionMatrix);
 
-    camera.matrixWorldInverse.copyInverse(camera.matrixWorld);
-
-    _viewProjectionMatrix = camera.projectionMatrix * camera.matrixWorldInverse;
-
-    _frustum.setFromMatrix( _viewProjectionMatrix );
-
-    _renderData = projectGraph( scene, false );
-
-    _renderData.objects.forEach((o) {
-
-      object = o.object;
-
-      modelMatrix = object.matrixWorld;
-
+    _projectGraph(scene, sortObjects);
+    
+    _renderData.objects.forEach((object) {
+      _modelMatrix = object.matrixWorld;
+      
       _vertexCount = 0;
-
-      if ( object is Mesh ) {
-
-        geometry = object.geometry;
-        geometryMaterials = object.geometry.materials;
-        vertices = geometry.vertices;
-        faces = geometry.faces;
-        faceVertexUvs = geometry.faceVertexUvs;
-
-        extractRotation( object.matrixRotationWorld, modelMatrix );
-        rotationMatrix = object.matrixRotationWorld;
-
-        isFaceMaterial = (object.material is MeshFaceMaterial);
-        side = object.material.side;
-
-        vertices.forEach((Vector3 v) {
-          _vertex = getNextVertexInPool();
-          _vertex.positionWorld.setFrom(v);
-
-          _vertex.positionWorld.applyProjection(modelMatrix);
-          _vertex.positionScreen = new Vector4(_vertex.positionWorld.x,
-              _vertex.positionWorld.y,
-              _vertex.positionWorld.z, 1.0); //  _vertex.positionWorld.clone();
-          _viewProjectionMatrix.transform( _vertex.positionScreen );
-          _vertex.positionScreen.x /= _vertex.positionScreen.w;
-          _vertex.positionScreen.y /= _vertex.positionScreen.w;
-
-          _vertex.visible = _vertex.positionScreen.z > near && _vertex.positionScreen.z < far;
+      
+      if (object is Mesh) {
+        var geometry = object.geometry;
+        
+        var vertices = geometry.vertices;
+        var faces = geometry.faces;
+        var faceVertexUvs = geometry.faceVertexUvs;
+        
+        _normalMatrix = _modelMatrix.getNormalMatrix();
+        
+        var isFaceMaterial = object.material is MeshFaceMaterial;
+        var objectMaterials = isFaceMaterial ? object.material : null;
+        
+        vertices.forEach((vertex) {
+          _vertex = getNextVertexInPool()
+              ..position.setFrom(vertex);
+          
+          _projectVertex(_vertex);
         });
+        
+        for (var f = 0; f < faces.length; f++) {
+          var face = faces[f];
 
-        fl = faces.length;
-        for ( f = 0; f < fl; f ++ ) {
+          var material = isFaceMaterial ? objectMaterials.materials[face.materialIndex]
+                                        : object.material;
 
-          face = faces[ f ];
+          if (material == null) continue;
 
-          material = isFaceMaterial == true ? geometryMaterials[ face.materialIndex ] : object.material;
+          var side = material.side;
 
-          if ( material == null ) continue;
+          var v1 = _vertexPool[face.a];
+          var v2 = _vertexPool[face.b];
+          var v3 = _vertexPool[face.c];
+          
+          if (material.morphTargets == true) {
+            var morphTargets = geometry.morphTargets;
+            var morphInfluences = object.morphTargetInfluences;
+            
+            var v1p = v1.position;
+            var v2p = v2.position;
+            var v3p = v3.position;
+            
+            var vA = new Vector3.zero();
+            var vB = new Vector3.zero();
+            var vC = new Vector3.zero();
+             
+            for (var t = 0; t < morphTargets.length; t++) {
+               var influence = morphInfluences[t];
+ 
+               if (influence == 0) continue;
+ 
+               var targets = morphTargets[t].vertices;
+ 
+               vA.x += (targets[face.a].x - v1p.x) * influence;
+               vA.y += (targets[face.a].y - v1p.y) * influence;
+               vA.z += (targets[face.a].z - v1p.z) * influence;
+ 
+               vB.x += (targets[face.b].x - v2p.x) * influence;
+               vB.y += (targets[face.b].y - v2p.y) * influence;
+               vB.z += (targets[face.b].z - v2p.z) * influence;
+ 
+               vC.x += (targets[face.c].x - v3p.x) * influence;
+               vC.y += (targets[face.c].y - v3p.y) * influence;
+               vC.z += (targets[face.c].z - v3p.z) * influence;
+             }
+             
+            v1.position.add(vA);
+            v2.position.add(vB);
+            v3.position.add(vC);
 
-          side = material.side;
+            _projectVertex(v1);
+            _projectVertex(v2);
+            _projectVertex(v3);
+          }
+          
+          _points3[0] = v1.positionScreen;
+          _points3[1] = v2.positionScreen;
+          _points3[2] = v3.positionScreen;
 
-          var vtx = face.indices.map((idx) => _vertexPool[idx]).toList();
+          if (v1.visible || v2.visible || v3.visible ||
+              _clipBox.intersectsWithBox3(_boundingBox..setFromPoints(_points3))) {
 
-          var allVtxVisible = vtx.every((v) => v.visible);
+            visible = ((v3.positionScreen.x - v1.positionScreen.x) *
+                       (v2.positionScreen.y - v1.positionScreen.y) -
+                       (v3.positionScreen.y - v1.positionScreen.y) *
+                       (v2.positionScreen.x - v1.positionScreen.x)) < 0;
 
-          if (allVtxVisible) {
-            if (face.size == 3) {
-              visible = (
-                  ( ( vtx[2].positionScreen.x - vtx[0].positionScreen.x ) * ( vtx[1].positionScreen.y - vtx[0].positionScreen.y ) -
-                    ( vtx[2].positionScreen.y - vtx[0].positionScreen.y ) * ( vtx[1].positionScreen.x - vtx[0].positionScreen.x ) ) < 0);
-            } else if (face.size == 4) {
-              visible = ( vtx[3].positionScreen.x - vtx[0].positionScreen.x ) * ( vtx[1].positionScreen.y - vtx[0].positionScreen.y ) -
-                  ( vtx[3].positionScreen.y - vtx[0].positionScreen.y ) * ( vtx[1].positionScreen.x - vtx[0].positionScreen.x ) < 0 ||
-                  ( vtx[1].positionScreen.x - vtx[2].positionScreen.x ) * ( vtx[3].positionScreen.y - vtx[2].positionScreen.y ) -
-                  ( vtx[1].positionScreen.y - vtx[2].positionScreen.y ) * ( vtx[3].positionScreen.x - vtx[2].positionScreen.x ) < 0;
-            }
+            if (side == DOUBLE_SIDE || side == FRONT_SIDE) {
+              _face = getNextFace3InPool();
 
-            if ( side == DoubleSide || visible == ( side == FrontSide ) ) {
-
-                _face = (face.size == 3) ? getNextFace3InPool() : getNextFace4InPool();
-
-                _face.vertices = vtx.map((v) => v.clone()).toList(growable: false);
+              _face.id = object.id;
+              _face.v1.copy(v1);
+              _face.v2.copy(v2);
+              _face.v3.copy(v3);
 
             } else {
               continue;
@@ -321,297 +293,258 @@ class Projector {
             continue;
           }
 
-          _face.normalWorld.setFrom( face.normal );
+          _face.normalModel.setFrom(face.normal);
 
-		      if ( visible == false && ( side == BackSide || side == DoubleSide ) ) _face.normalWorld.negate();
-		      _face.normalWorld.applyProjection(rotationMatrix);
+          if (!visible && (side == BACK_SIDE || side == DOUBLE_SIDE)) {
+            _face.normalModel.negate();
+          }
+          
+          _normalMatrix.transform(_face.normalModel..normalize());
+          _normalViewMatrix.transform(_face.normalModelView..setFrom(_face.normalModel));
+          _modelMatrix.transform3(_face.centroidModel..setFrom(face.centroid));
+          
+          for (var n = 0; n < Math.min(face.vertexNormals.length, 3); n++) {
+            var normalModel = _face.vertexNormalsModel[n];
+            normalModel.setFrom(face.vertexNormals[n]);
 
-          _face.centroidWorld.setFrom( face.centroid );
-          _face.centroidWorld.applyProjection(modelMatrix);
+            if (!visible && (side == BACK_SIDE || side == DOUBLE_SIDE)) {
+              normalModel.negate();
+            }
+            
+            _normalMatrix.transform(normalModel..normalize());
 
-          _face.centroidScreen.setFrom( _face.centroidWorld );
-          _face.centroidScreen.applyProjection(_viewProjectionMatrix);
+            var normalModelView = _face.vertexNormalsModelView[n];
+            _normalViewMatrix.transform(normalModelView..setFrom(normalModel));
 
-          faceVertexNormals = face.vertexNormals;
-
-          nl = faceVertexNormals.length;
-          for ( n = 0; n < nl; n ++ ) {
-            normal = _face.vertexNormalsWorld[ n ];
-            normal.setFrom( faceVertexNormals[ n ] );
-
-            if ( !visible && ( side == BackSide || side == DoubleSide ) ) normal.negate();
-
-            normal.applyProjection(rotationMatrix);
           }
 
-          cl = faceVertexUvs.length;
-          for ( c = 0; c < cl; c ++ ) {
-            if ( faceVertexUvs[c].length == 0 ) continue;
+          _face.vertexNormalsLength = face.vertexNormals.length;
 
-            List<UV> uvs = faceVertexUvs[ c ][ f ];
+          for (var c = 0; c < Math.min(faceVertexUvs.length, 3); c++) {
+            var uvs = faceVertexUvs[c][f];
 
-            if ( uvs == null ) continue;
+            if (uvs == null) continue;
 
-            //TODO: interpreting this code as dynamically creating arrays.
-            ul = uvs.length;
-            for ( u = 0; u < ul; u ++ ) {
-              List faceUVs = _face.uvs[c];
-              faceUVs.add(uvs[u]);
-              //_face.uvs[ c ][ u ] = uvs[ u ];
+            for (var u = 0; u < uvs.length; u++) {
+              _face.uvs[c][u] = uvs[u];
             }
           }
 
+          _face.color = face.color;
           _face.material = material;
-          _face.faceMaterial = face.materialIndex != null ? geometryMaterials[ face.materialIndex ] : null;
 
-          _face.z = _face.centroidScreen.z;
+          _centroid.setFrom(_face.centroidModel)..applyProjection(_viewProjectionMatrix);
 
-          _renderData.elements.add( _face );
+          _face.z = _centroid.z;
+
+          _renderData.elements.add(_face);
         }
+      } else if (object is Line) {
+        _modelViewProjectionMatrix =_viewProjectionMatrix *_modelMatrix;
 
-      } else if ( object is Line ) {
-        _modelViewProjectionMatrix = _viewProjectionMatrix * modelMatrix;
+        var vertices = object.geometry.vertices;
 
-        vertices = object.geometry.vertices;
+        var v1 = getNextVertexInPool();
+        v1.positionScreen.setFrom(_modelViewProjectionMatrix.transform3(vertices[0]));
 
-        v1 = getNextVertexInPool();
-        Vector3 vec = vertices[ 0 ];
-        v1.positionScreen = new Vector4(vec.x, vec.y, vec.z, 1.0);
-        _modelViewProjectionMatrix.transform( v1.positionScreen );
+        // Handle LineStrip and LinePieces
+        var step = object.type == LINE_PIECES ? 2 : 1;
 
-      // Handle LineStrip and LinePieces
-        var step = object.type == LinePieces ? 2 : 1;
+        for (var v = 1; v < vertices.length; v++) {
 
-        vl = vertices.length;
-        for ( v = 1; v < vl; v++ ) {
+          var v1 = getNextVertexInPool();
+          v1.positionScreen.setFrom(_modelViewProjectionMatrix.transform3(vertices[v]));
 
-          v1 = getNextVertexInPool();
-          Vector3 vec = vertices[ v ];
-          v1.positionScreen = new Vector4(vec.x, vec.y, vec.z, 1.0);
-          _modelViewProjectionMatrix.transform( v1.positionScreen );
+          if ((v + 1) % step > 0) continue;
 
-          if ( ( v + 1 ) % step > 0 ) continue;
-
-          v2 = _vertexPool[ _vertexCount - 2 ];
+          var v2 = _vertexPool[_vertexCount - 2];
 
           _clippedVertex1PositionScreen.setFrom(v1.positionScreen);
           _clippedVertex2PositionScreen.setFrom(v2.positionScreen);
 
-          if ( clipLine( _clippedVertex1PositionScreen, _clippedVertex2PositionScreen ) ) {
+          if (clipLine(_clippedVertex1PositionScreen, _clippedVertex2PositionScreen)) {
             // Perform the perspective divide
-            _clippedVertex1PositionScreen /= _clippedVertex1PositionScreen.w;
-            _clippedVertex2PositionScreen /= _clippedVertex2PositionScreen.w;
+            _clippedVertex1PositionScreen.scale(1 / _clippedVertex1PositionScreen.w);
+            _clippedVertex2PositionScreen.scale(1 / _clippedVertex2PositionScreen.w);
 
             _line = getNextLineInPool();
-            _line.v1.positionScreen.setFrom(_clippedVertex1PositionScreen);
-            _line.v2.positionScreen.setFrom(_clippedVertex2PositionScreen);
 
-            _line.z = Math.max( _clippedVertex1PositionScreen.z, _clippedVertex2PositionScreen.z );
+            _line.id = object.id;
+            _line.v1.positionScreen.setFrom( _clippedVertex1PositionScreen );
+            _line.v2.positionScreen.setFrom( _clippedVertex2PositionScreen );
+
+            _line.z = Math.max(_clippedVertex1PositionScreen.z, _clippedVertex2PositionScreen.z);
 
             _line.material = object.material;
 
-            _renderData.elements.add( _line );
+            if (object.material.vertexColors == VERTEX_COLORS) {
+
+              _line.vertexColors[0].setFrom(object.geometry.colors[v]);
+              _line.vertexColors[1].setFrom(object.geometry.colors[v - 1]);
+            }
+
+            _renderData.elements.add(_line);
           }
         }
       }
     });
+    
+    _renderData.sprites.forEach((object) {
+      _modelMatrix = object.matrixWorld;
 
-   _renderData.sprites.forEach((o) {
+      _vector4.setValues(_modelMatrix[12], _modelMatrix[13], _modelMatrix[14], 1.0);
+      _vector4.applyMatrix4(_viewProjectionMatrix);
 
-      object = o.object;
+      var invW = 1 / _vector4.w;
 
-      modelMatrix = object.matrixWorld;
+      _vector4.z *= invW;
 
-      if ( object is Particle ) {
-        _vector4.setValues ( modelMatrix[12], modelMatrix[13], modelMatrix[14], 1.0 );
-        _viewProjectionMatrix.transform( _vector4 );
+      if (_vector4.z >= -1 && _vector4.z <= 1) {
+        _sprite = getNextSpriteInPool()
+            ..id = object.id
+            ..x = _vector4.x * invW
+            ..y = _vector4.y * invW
+            ..z = _vector4.z
+            ..object = object
 
-        _vector4.z /= _vector4.w;
+            ..rotation = object.rotation
 
-        if ( _vector4.z > 0 && _vector4.z < 1 ) {
-          _particle = getNextParticleInPool();
-          _particle.x = _vector4.x / _vector4.w;
-          _particle.y = _vector4.y / _vector4.w;
-          _particle.z = _vector4.z;
+            ..scale.x = object.scale.x * (_sprite.x - (_vector4.x + camera.projectionMatrix[0]) / (_vector4.w + camera.projectionMatrix[12])).abs()
+            ..scale.y = object.scale.y * (_sprite.y - (_vector4.y + camera.projectionMatrix[5]) / ( _vector4.w + camera.projectionMatrix[13])).abs()
 
-          _particle.rotation = object.rotation.z;
+            ..material = object.material;
 
-          _particle.scale.x = object.scale.x * ( _particle.x - ( _vector4.x + camera.projectionMatrix[0] ) / ( _vector4.w + camera.projectionMatrix[12] ) ).abs();
-          _particle.scale.y = object.scale.y * ( _particle.y - ( _vector4.y + camera.projectionMatrix[5] ) / ( _vector4.w + camera.projectionMatrix[13] ) ).abs();
-
-          _particle.material = object.material as Material;
-
-          _renderData.elements.add( _particle );
-        }
+        _renderData.elements.add(_sprite);
       }
     });
 
-    if ( sort ) {
-      _renderData.elements.sort( painterSort );
-    }
-
+    if (sortElements) _renderData.elements.sort(_painterSort);
     return _renderData;
   }
+  
 
-  // Pools
+  /*
+   *  Pools
+   */
+  
   RenderableObject getNextObjectInPool() {
-    //TODO: make sure I've interpreted this logic correctly
-    // RenderableObject object = _objectPool[ _objectCount ] = _objectPool[ _objectCount ] || new RenderableObject();
-
-    RenderableObject object;
-    if ( _objectCount < _objectPool.length ) {
-      object = ( _objectPool[ _objectCount ] != null ) ? _objectPool[ _objectCount ] : new RenderableObject();
-    } else {
-      object = new RenderableObject();
+    if (_objectCount == _objectPoolLength) {
+      var object = new RenderableObject();
       _objectPool.add(object);
+      _objectPoolLength++;
+      _objectCount++;
+      return object;
     }
 
-    _objectCount ++;
-
-    return object;
+    return _objectPool[_objectCount++];
   }
 
   RenderableVertex getNextVertexInPool() {
-    //TODO: make sure I've interpreted this logic correctly
-    // var vertex = _vertexPool[ _vertexCount ] = _vertexPool[ _vertexCount ] || new THREE.RenderableVertex();
-    RenderableVertex vertex;
-
-    // Vertex is already within List
-    if ( _vertexCount < _vertexPool.length ) {
-      vertex = ( _vertexPool[ _vertexCount ] != null ) ? _vertexPool[ _vertexCount ] : new RenderableVertex();
-    } else {
-      vertex = new RenderableVertex();
+    if (_vertexCount == _vertexPoolLength) {
+      var vertex = new RenderableVertex();
       _vertexPool.add(vertex);
+      _vertexPoolLength++;
+      _vertexCount++;
+      return vertex;
     }
 
-    _vertexCount ++;
-
-    return vertex;
+    return _vertexPool[ _vertexCount++];
   }
 
-  RenderableFace getNextFace3InPool() {
-    //TODO: make sure I've interpreted this logic correctly
-    // RenderableFace3 face = _face3Pool[ _face3Count ] = _face3Pool[ _face3Count ] || new RenderableFace3();
-    RenderableFace3 face;
-    if ( _face3Count < _face3Pool.length ) {
-      face = ( _face3Pool[ _face3Count ] != null ) ? _face3Pool[ _face3Count ] : new RenderableFace3();
-    } else {
-      face = new RenderableFace3();
+  RenderableFace3 getNextFace3InPool() {
+    if (_face3Count == _face3PoolLength) {
+      var face = new RenderableFace3();
       _face3Pool.add(face);
+      _face3PoolLength++;
+      _face3Count++;
+      return face;
     }
-
-    _face3Count ++;
-
-    return face;
+    
+    return _face3Pool[_face3Count++];
   }
 
-  RenderableFace getNextFace4InPool() {
-
-    RenderableFace4 face;
-    if ( _face4Count < _face4Pool.length ) {
-      face = ( _face4Pool[ _face4Count ] != null ) ? _face4Pool[ _face4Count ] : new RenderableFace4();
-    } else {
-      face = new RenderableFace4();
-      _face4Pool.add(face);
-    }
-
-    _face4Count ++;
-
-    return face;
-  }
 
   RenderableLine getNextLineInPool() {
-    //TODO: make sure I've interpreted this logic correctly
-    //RenderableLine line = _linePool[ _lineCount ] = _linePool[ _lineCount ] || new RenderableLine();
-    RenderableLine line;
-    if ( _lineCount < _linePool.length ) {
-      line = ( _linePool[ _lineCount ] != null ) ? _linePool[ _lineCount ] : new RenderableLine();
-    } else {
-      line = new RenderableLine();
+    if (_lineCount == _linePoolLength) {
+      var line = new RenderableLine();
       _linePool.add(line);
+      _linePoolLength++;
+      _lineCount++;
+      return line;
     }
-
-    _lineCount ++;
-
-    return line;
+    
+    return _linePool[_lineCount++];
   }
 
-  RenderableParticle getNextParticleInPool() {
-    //TODO: make sure I've interpreted this logic correctly
-    //RenderableParticle particle = _particlePool[ _particleCount ] = _particlePool[ _particleCount ] || new RenderableParticle();
-    RenderableParticle particle;
-    if ( _particleCount < _particlePool.length ) {
-      particle = ( _particlePool[ _particleCount ] != null ) ? _particlePool[ _particleCount ] : new RenderableParticle();
-    } else {
-      particle = new RenderableParticle();
-      _particlePool.add(particle);
+  RenderableSprite getNextSpriteInPool() {
+    if (_spriteCount == _spritePoolLength) {
+      var sprite = new RenderableSprite();
+      _spritePool.add(sprite);
+      _spritePoolLength++;
+      _spriteCount++;
+      return sprite;
     }
 
-    _particleCount ++;
-    return particle;
+    return _spritePool[_spriteCount++];
   }
 
-  int painterSort( a, b ) => b.z.compareTo(a.z);
-
-  bool clipLine( Vector4 s1, Vector4 s2 ) {
-    double alpha1 = 0.0, alpha2 = 1.0,
+  int _painterSort(a, b) => a.z.compareTo(b.z) != 0 ? a.z.compareTo(b.z) : b.id.compareTo(a.id);
+  
+  bool clipLine(Vector4 s1, Vector4 s2) {
+    var alpha1 = 0, alpha2 = 1,
 
     // Calculate the boundary coordinate of each vertex for the near and far clip planes,
     // Z = -1 and Z = +1, respectively.
     bc1near =  s1.z + s1.w,
     bc2near =  s2.z + s2.w,
-    bc1far =  - s1.z + s1.w,
-    bc2far =  - s2.z + s2.w;
+    bc1far =  -s1.z + s1.w,
+    bc2far =  -s2.z + s2.w;
 
-    if ( bc1near >= 0 && bc2near >= 0 && bc1far >= 0 && bc2far >= 0 ) {
+    if (bc1near >= 0 && bc2near >= 0 && bc1far >= 0 && bc2far >= 0) {
       // Both vertices lie entirely within all clip planes.
       return true;
-    } else if ( ( bc1near < 0 && bc2near < 0) || (bc1far < 0 && bc2far < 0 ) ) {
+    } else if ((bc1near < 0 && bc2near < 0) || (bc1far < 0 && bc2far < 0)) {
       // Both vertices lie entirely outside one of the clip planes.
       return false;
     } else {
       // The line segment spans at least one clip plane.
-      if ( bc1near < 0 ) {
+      if (bc1near < 0) {
         // v1 lies outside the near plane, v2 inside
-        alpha1 = Math.max( alpha1, bc1near / ( bc1near - bc2near ) );
-      } else if ( bc2near < 0 ) {
+        alpha1 = Math.max(alpha1, bc1near / (bc1near - bc2near));
+      } else if (bc2near < 0) {
         // v2 lies outside the near plane, v1 inside
-        alpha2 = Math.min( alpha2, bc1near / ( bc1near - bc2near ) );
+        alpha2 = Math.min(alpha2, bc1near / (bc1near - bc2near));
       }
 
-      if ( bc1far < 0 ) {
+      if (bc1far < 0) {
         // v1 lies outside the far plane, v2 inside
-        alpha1 = Math.max( alpha1, bc1far / ( bc1far - bc2far ) );
-      } else if ( bc2far < 0 ) {
+        alpha1 = Math.max(alpha1, bc1far / (bc1far - bc2far));
+      } else if (bc2far < 0) {
         // v2 lies outside the far plane, v2 inside
-        alpha2 = Math.min( alpha2, bc1far / ( bc1far - bc2far ) );
+        alpha2 = Math.min(alpha2, bc1far / ( bc1far - bc2far));
       }
 
-      if ( alpha2 < alpha1 ) {
+      if (alpha2 < alpha1) {
         // The line segment spans two boundaries, but is outside both of them.
         // (This can't happen when we're only clipping against just near/far but good
         //  to leave the check here for future usage if other clip planes are added.)
         return false;
+
       } else {
         // Update the s1 and s2 vertices to match the clipped line segment.
-        s1 = lerp4(s1, s2, alpha1 );
-        s2 = lerp4(s2, s1, 1.0 - alpha2 );
-
+        s1.lerp(s2, alpha1);
+        s2.lerp(s1, 1 - alpha2);
         return true;
       }
     }
   }
 }
 
-// _renderData = { "objects": [], "sprites": [], "lights": [], "elements": [] };
 class ProjectorRenderData {
-  List objects, sprites, lights, elements;
-
-  ProjectorRenderData()
-      : objects = [],
-        sprites = [],
-        lights = [],
-        elements = [];
+  List objects = [];
+  List sprites = [];
+  List lights = [];
+  List elements = [];
 }
 
 

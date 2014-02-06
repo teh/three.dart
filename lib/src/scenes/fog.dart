@@ -1,5 +1,8 @@
 part of three;
 
-class Fog {
+abstract class Fog {
+  String name;
   Color color;
+  
+  clone();
 }

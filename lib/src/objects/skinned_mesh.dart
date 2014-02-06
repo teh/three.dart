@@ -1,86 +1,72 @@
+/*
+ * @author mikael emtinger / http://gomo.se/
+ * @author alteredq / http://alteredqualia.com/
+ */
+
 part of three;
 
 class SkinnedMesh extends Mesh {
-	bool useVertexTexture;
-	num boneTextureWidth, boneTextureHeight;
-	List bones;
-	List boneMatrices;
-	Matrix4 identityMatrix;
-	DataTexture boneTexture;
+  bool useVertexTexture;
+  
+  List<Bone> bones;
+  List boneMatrices;
+  List boneInverses;
+  
+  Matrix4 identityMatrix = new Matrix4.identity();
+  
+  int boneTextureWidth, boneTextureHeight;
+  DataTexture boneTexture;
 
-	SkinnedMesh( geometry, material, {this.useVertexTexture: true} )
-      : identityMatrix = new Matrix4.identity(),
-        bones = [],
-        boneMatrices = [],
-        super(geometry, material) {
-
-    var gbone, bone;
-    var p, q, s;
-
-    if ( geometry["bones"] != null ) {
-
-      for( gbone in geometry["bones"]) {
-
-        p = gbone.pos;
-        q = gbone.rotq;
-        s = gbone.scl;
-
-        bone = addBone();
-
-        bone.name = gbone.name;
-        bone.position.set( p[0], p[1], p[2] );
-        bone.quaternion.set( q[0], q[1], q[2], q[3] );
-        bone.useQuaternion = true;
-
-        if ( s != null ) {
-
-          bone.scale.set( s[0], s[1], s[2] );
-
+  SkinnedMesh(Geometry geometry, Material material, {this.useVertexTexture: true}) 
+      : super(geometry, material) {
+    
+    if (geometry.bones != null) {
+      geometry.bones.forEach((gbone) {
+        var p = gbone["pos"];
+        var q = gbone["rotq"];
+        var s = gbone["scl"];
+        
+        Bone bone = addBone();
+        bone.name = gbone["name"];
+        bone.position.copyFromArray(p);
+        bone.quaternion.copyFromArray(q);
+        
+        if (s != null) {
+          bone.scale.copyFromArray(s);
         } else {
-
-          bone.scale.set( 1, 1, 1 );
-
+          bone.scale = new Vector3.one();
         }
+      });
+      
+      for (var b = 0; b < bones.length; b++) {
+        var gbone = geometry.bones[b];
+        var bone = bones[b];
 
-      }
-
-      for ( var b = 0; b < this.bones.length; b ++ ) {
-
-        gbone = geometry["bones"][ b ];
-        bone = bones[ b ];
-
-        if ( gbone.parent == -1 ) {
-
-          this.add( bone );
-
+        if (gbone["parent"] == -1) {
+          add(bone);
         } else {
-
-          bones[ gbone.parent ].add( bone );
-
+          bones[gbone["parent"]].add(bone);
         }
-
       }
-
-      //
-
+      
       var nBones = bones.length;
-
-      if ( useVertexTexture ) {
-
+      
+      if (useVertexTexture) {
+        
         // layout (1 matrix = 4 pixels)
-        //  RGBA RGBA RGBA RGBA (=> column1, column2, column3, column4)
-        //  with  8x8  pixel texture max   16 bones  (8 * 8  / 4)
-        //     16x16 pixel texture max   64 bones (16 * 16 / 4)
-        //     32x32 pixel texture max  256 bones (32 * 32 / 4)
-        //     64x64 pixel texture max 1024 bones (64 * 64 / 4)
+        //        RGBA RGBA RGBA RGBA (=> column1, column2, column3, column4)
+        //  with  8x8   pixel texture max   16 bones  (8 * 8  / 4)
+        //        16x16 pixel texture max   64 bones (16 * 16 / 4)
+        //        32x32 pixel texture max  256 bones (32 * 32 / 4)
+        //        64x64 pixel texture max 1024 bones (64 * 64 / 4)
 
         var size;
 
-        if ( nBones > 256 ) {
+        if (nBones > 256) {
           size = 64;
-        } else if ( nBones > 64 ) {
+        } else if (nBones > 64) {
           size = 32;
-        } else if ( nBones > 16 ) {
+        } else if (nBones > 16) {
           size = 16;
         } else {
           size = 8;
@@ -88,151 +74,96 @@ class SkinnedMesh extends Mesh {
 
         boneTextureWidth = size;
         boneTextureHeight = size;
-        boneMatrices = new Float32List( boneTextureWidth * boneTextureHeight * 4 ); // 4 floats per RGBA pixel
-        boneTexture = new DataTexture( boneMatrices, boneTextureWidth, boneTextureHeight, RGBAFormat, type: FloatType );
-        boneTexture.minFilter = NearestFilter;
-        boneTexture.magFilter = NearestFilter;
+
+        boneMatrices = new Float32List(boneTextureWidth * boneTextureHeight * 4); // 4 floats per RGBA pixel
+        boneTexture = new DataTexture(boneMatrices, boneTextureWidth, boneTextureHeight, RGBA_FORMAT, type: FLOAT_TYPE);
+        boneTexture.minFilter = NEAREST_FILTER;
+        boneTexture.magFilter = NEAREST_FILTER;
         boneTexture.generateMipmaps = false;
         boneTexture.flipY = false;
-
       } else {
-
-        boneMatrices = new Float32List( 16 * nBones );
-
+        boneMatrices = new Float32List(16 * nBones);
       }
-
       pose();
-
     }
-	}
+  }
+  
+  Bone addBone([Bone bone]) {
+    if (bone == null) {
+      bone = new Bone(this);
+    }
+    
+    bones.add(bone);
+    return bone;
+  }
 
-	addBone( {Bone bone} ) {
+  void updateMatrixWorld([force = false]) {
+    var offsetMatrix = new Matrix4.identity();
+    
+    if (matrixAutoUpdate) updateMatrix();
+    
+    // update matrixWorld
+    if (matrixWorldNeedsUpdate || force) {
+      if (parent != null) {
+        matrixWorld = parent.matrixWorld * matrix;
+      } else {
+        matrixWorld.setFrom(matrix);
+      }
+      
+      matrixWorldNeedsUpdate = false; 
+      force = true;
+    }
+    
+    // update children
+    children.forEach((child) {
+      if (child is Bone) {
+        child.update(identityMatrix, false);
+      } else {
+        child.updateMatrixWorld(true);
+      }
+    });
+    
+    // make a snapshot of the bones' rest position
+    if (boneInverses == null) {
+      boneInverses = [];
+      
+      bones.forEach((bone) => boneInverses.add(new Matrix4.identity()..copyInverse(bone.skinMatrix)));
+    }
+    
+    // flatten bone matrices to array
+    for (var b = 0; b < bones.length; b++) {
+      // compute the offset between the current and the original transform;
 
-	  if ( bone == null ) {
-	    bone = new Bone( this );
-	  }
+      // TODO: we could get rid of this multiplication step if the skinMatrix
+      // was already representing the offset; however, this requires some
+      // major changes to the animation system
 
-	  bones.add( bone );
+      offsetMatrix = bones[b].skinMatrix * boneInverses[b];
+      offsetMatrix.copyIntoArray(boneMatrices, b * 16);
+    }
 
-	  return bone;
+    if (useVertexTexture) {
+      boneTexture.needsUpdate = true;
+    }
+  }
 
-	}
-
-	updateMatrixWorld({force: false}) {
-
-	  if(matrixAutoUpdate) updateMatrix();
-
-	  // update matrixWorld
-
-	  if ( matrixWorldNeedsUpdate || force ) {
-
-	    if ( parent != null) {
-
-	      matrixWorld = parent.matrixWorld * matrix;
-
-	    } else {
-
-	      matrixWorld.setFrom( matrix );
-
-	    }
-
-	    matrixWorldNeedsUpdate = false;
-
-	    force = true;
-
-	  }
-
-	  // update children
-	  children.forEach((child) {
-
-	    if ( child is Bone ) {
-	      child.update( identityMatrix, false );
-	    } else {
-	      child.updateMatrixWorld( true );
-	    }
-
-	  });
-
-	  // flatten bone matrices to array
-
-	  var b, bl = this.bones.length,
-	      ba = this.bones,
-	      bm = this.boneMatrices;
-
-	  for ( b = 0; b < bl; b ++ ) {
-	    ba[ b ].skinMatrix.flattenToArrayOffset( bm, b * 16 );
-
-	  }
-
-	  if ( useVertexTexture ) {
-	    boneTexture.needsUpdate = true;
-	  }
-
-	}
-
-	/*
-	 * Pose
-	 */
-
-	pose() {
-
-	  updateMatrixWorld( force: true );
-
-	  var bim, bone;
-
-	  List<Matrix4> boneInverses = [];
-
-	  for ( var b = 0; b < bones.length; b ++ ) {
-
-	    bone = bones[ b ];
-
-	    var inverseMatrix = bone.skinMatrix.clone();
-	    inverseMatrix.invert();
-
-	    boneInverses.add( inverseMatrix );
-
-	    bone.skinMatrix.flattenToArrayOffset( boneMatrices, b * 16 );
-
-	  }
-
-	  // project vertices to local
-
-	  if ( geometry["skinVerticesA"] == null ) {
-
-	    geometry["skinVerticesA"] = [];
-	    geometry["skinVerticesA"] = [];
-
-	    var orgVertex, vertex;
-
-	    for ( var i = 0; i < geometry.skinIndices.length; i ++ ) {
-
-	      orgVertex = geometry.vertices[ i ];
-
-	      var indexA = geometry.skinIndices[ i ].x;
-	      var indexB = geometry.skinIndices[ i ].y;
-
-	      vertex = new Vector3( orgVertex.x, orgVertex.y, orgVertex.z );
-	      geometry["skinVerticesA"].add(vertex.applyProjection(boneInverses[indexA]));
-
-	      vertex = new Vector3( orgVertex.x, orgVertex.y, orgVertex.z );
-	      geometry["skinVerticesA"].add(vertex.applyProjection(boneInverses[indexB]));
-
-	      // todo: add more influences
-
-	      // normalize weights
-
-	      if ( geometry.skinWeights[ i ].x + geometry.skinWeights[ i ].y != 1 ) {
-
-	        var len = ( 1.0 - ( geometry.skinWeights[ i ].x + geometry.skinWeights[ i ].y ) ) * 0.5;
-	        geometry.skinWeights[ i ].x += len;
-	        geometry.skinWeights[ i ].y += len;
-
-	      }
-
-	    }
-
-	  }
-
-	}
-
+  void pose() {
+    updateMatrixWorld(true); 
+    normalizeSkinWeights();
+  }
+  
+  void normalizeSkinWeights() {
+    if (geometry is Geometry) {
+      geometry.skinIndices.forEach((sw) {
+        var scale = 1.0 / sw.lengthManhattan();
+        if (scale.isFinite) {
+          sw.scale(scale);
+        } else {
+          sw = new Vector4.splat(1.0);
+        }
+      });
+    } else {
+      // skinning weights assumed to be normalized for BufferGeometry
+    }
+  }
 }

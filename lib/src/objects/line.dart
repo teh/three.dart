@@ -1,31 +1,30 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  *
  * Ported to Dart from JS by:
  * @author adam smith / http://financecoding.wordpress.com/
  */
 
-class Line extends Object3D {
+part of three;
 
-  Geometry geometry;
+class Line extends Object3D {
+  var geometry; // EdgesHelper use BufferGeometry
   Material material;
   int type;
 
+  Line(this.geometry, [this.material, this.type = LINE_STRIP]) : super() {
+    if (material == null) { 
+      material = new LineBasicMaterial(color: MathUtils.randHex()); 
+    }
 
-  Line(this.geometry, [this.material, this.type = LineStrip]) : super() {
-
-    if (material == null) { material = new LineBasicMaterial( color: new Math.Random().nextInt(0xffffff) ); }
-
-    if ( geometry != null ) {
+    if (geometry != null) {
       // calc bound radius
-      if( geometry.boundingSphere == null ) {
+      if(geometry.boundingSphere == null) {
         geometry.computeBoundingSphere();
       }
     }
   }
 }
 
-const int LineStrip = 0;
-const int LinePieces = 1;
+const int LINE_STRIP = 0;
+const int LINE_PIECES = 1;

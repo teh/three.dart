@@ -1,54 +1,37 @@
-/**
-  * @author mrdoob / http://mrdoob.com/
-  * @author alteredq / http://alteredqualia.com/
-  * @author paulirish / http://paulirish.com/
-  *
-  * Ported to Dart from JS by:
-  * @author jessevogt / http://jvogt.net/
-  *
-  * based on rev 04b652ae26e228796f67838c0ec4d555e8b16528
-  */
-library FirstPersonControls;
-
-import "dart:html";
-import "dart:math" as Math;
-import 'package:vector_math/vector_math.dart';
-import "package:three/three.dart" as THREE;
-import 'package:three/src/core/three_math.dart' as THREEMath;
+part of controls;
 
 class FirstPersonControls {
-  THREE.Object3D object;
+  Object3D object;
   Vector3 target = new Vector3.zero();
-
-  Element domElement;
-
-  num movementSpeed = 1.0;
-  num lookSpeed = 0.005;
-
+  
+  var domElement; // HtmlDocument or Element
+  
+  double movementSpeed = 1.0;
+  double lookSpeed = 0.005;
+  
   bool lookVertical = true;
   bool autoForward = false;
-  // bool invertVertical = false;
-
+  
   bool activeLook = true;
-
+  
   bool heightSpeed = false;
-  num heightCoef = 1.0;
-  num heightMin = 0.0;
-  num heightMax = 1.0;
-
+  double heightCoef = 1.0;
+  double heightMin = 0.0;
+  double heightMax = 1.0;
+  
   bool constrainVertical = false;
-  num verticalMin = 0;
-  num verticalMax = Math.PI;
+  double verticalMin = 0.0;
+  double verticalMax = Math.PI;
 
-  num autoSpeedFactor = 0.0;
+  double autoSpeedFactor = 0.0;
 
-  num mouseX = 0;
-  num mouseY = 0;
+  int mouseX = 0;
+  int mouseY = 0;
 
-  num lat = 0;
-  num lon = 0;
-  num phi = 0;
-  num theta = 0;
+  double lat = 0.0;
+  double lon = 0.0;
+  double phi = 0.0;
+  double theta = 0.0;
 
   bool moveForward = false;
   bool moveBackward = false;
@@ -60,201 +43,168 @@ class FirstPersonControls {
 
   bool mouseDragOn = false;
 
-  num viewHalfX = 0;
-  num viewHalfY = 0;
-
-  FirstPersonControls(this.object, [Element domElement]) {
-    this.domElement = (domElement != null) ? domElement : document.body;
-
-    if ( this.domElement != document.body ) {
+  int viewHalfX = 0;
+  int viewHalfY = 0;
+  
+  FirstPersonControls(this.object, [Element domElement])
+      : this.domElement = domElement != null ? domElement : document {
+    if (domElement != null) {
       this.domElement.tabIndex = -1;
     }
-
-    this.domElement.onContextMenu.listen((event) => event.preventDefault());
-
-    this.domElement.onMouseMove.listen(this.onMouseMove);
-    this.domElement.onMouseDown.listen(this.onMouseDown);
-    this.domElement.onMouseUp.listen(this.onMouseUp);
-    this.domElement.onKeyDown.listen(this.onKeyDown);
-    this.domElement.onKeyUp.listen(this.onKeyUp);
-
-    this.handleResize();
+    
+    this.domElement
+        ..onContextMenu.listen((event) => event.preventDefault())
+        ..onMouseMove.listen(_onMouseMove)
+        ..onMouseDown.listen(_onMouseDown)
+        ..onMouseUp.listen(_onMouseUp)
+        ..onKeyDown.listen(_onKeyDown)
+        ..onKeyUp.listen(_onKeyUp);
+    
+    handleResize();
   }
-
-   void handleResize() {
-    if ( this.domElement == document.body ) {
-      this.viewHalfX = window.innerWidth / 2;
-      this.viewHalfY = window.innerHeight / 2;
+  
+  void handleResize() {
+    if (domElement == document) {
+      viewHalfX = window.innerWidth ~/ 2;
+      viewHalfY = window.innerHeight ~/ 2;
     } else {
-      this.viewHalfX = this.domElement.offsetWidth / 2;
-      this.viewHalfY = this.domElement.offsetHeight / 2;
+      viewHalfX = domElement.offsetWidth ~/ 2;
+      viewHalfY = domElement.offsetHeight ~/ 2;
     }
   }
-
-  void onMouseDown(event) {
-
-    if ( this.domElement != document.body ) {
-      this.domElement.focus();
-    }
+  
+  void _onMouseDown(MouseEvent event) {
+    if (domElement != document) domElement.focus();
 
     event.preventDefault();
     event.stopPropagation();
 
-    if ( this.activeLook ) {
-      switch ( event.button ) {
-        case 0: this.moveForward = true; break;
-        case 2: this.moveBackward = true; break;
+    if (activeLook) {
+      switch (event.button) {
+        case 0: moveForward = true; break;
+        case 2: moveBackward = true; break;
       }
     }
 
-    this.mouseDragOn = true;
+    mouseDragOn = true;
   }
-
-  void onMouseUp(event) {
+  
+  void _onMouseUp(MouseEvent event) {
     event.preventDefault();
     event.stopPropagation();
 
-    if ( this.activeLook ) {
-      switch ( event.button ) {
-        case 0: this.moveForward = false; break;
-        case 2: this.moveBackward = false; break;
+    if (activeLook) {
+      switch (event.button) {
+        case 0: moveForward = false; break;
+        case 2: moveBackward = false; break;
       }
     }
-    this.mouseDragOn = false;
-  }
 
-  void onMouseMove(event) {
-    if ( this.domElement == document.body ) {
-      this.mouseX = event.page.x - this.viewHalfX;
-      this.mouseY = event.page.y - this.viewHalfY;
+    mouseDragOn = false;
+  }
+  
+  void _onMouseMove(MouseEvent event) {
+    if (domElement == document) {
+      mouseX = event.page.x - this.viewHalfX;
+      mouseY = event.page.y - this.viewHalfY;
     } else {
-      this.mouseX = event.page.x - this.domElement.offsetLeft - this.viewHalfX;
-      this.mouseY = event.page.y - this.domElement.offsetTop - this.viewHalfY;
+      mouseX = event.page.x - domElement.offsetLeft - viewHalfX;
+      mouseY = event.page.y - domElement.offsetTop - viewHalfY;
     }
   }
+  
+  void _onKeyDown(KeyboardEvent event) {
+    switch (event.keyCode) {
+      case KeyCode.UP:
+      case KeyCode.W: moveForward = true; break;
 
-  void onKeyDown(event) {
+      case KeyCode.LEFT:
+      case KeyCode.A: moveLeft = true; break;
+      
+      case KeyCode.DOWN:
+      case KeyCode.S: moveBackward = true; break;
+      
+      case KeyCode.RIGHT:
+      case KeyCode.D: moveRight = true; break;
 
-    //event.preventDefault();
+      case KeyCode.R: moveUp = true; break;
+      case KeyCode.F: moveDown = true; break;
 
-    switch ( event.keyCode ) {
-      case 38: /*up*/
-      case 87: /*W*/ this.moveForward = true; break;
-
-      case 37: /*left*/
-      case 65: /*A*/ this.moveLeft = true; break;
-
-      case 40: /*down*/
-      case 83: /*S*/ this.moveBackward = true; break;
-
-      case 39: /*right*/
-      case 68: /*D*/ this.moveRight = true; break;
-
-      case 82: /*R*/ this.moveUp = true; break;
-      case 70: /*F*/ this.moveDown = true; break;
-
-      case 81: /*Q*/ this.freeze = !this.freeze; break;
+      case KeyCode.Q: freeze = !freeze; break;
     }
   }
+  
+  void _onKeyUp(KeyboardEvent event) {
+    switch (event.keyCode) {
+      case KeyCode.UP:
+      case KeyCode.W: moveForward = false; break;
 
-  void onKeyUp(event) {
+      case KeyCode.LEFT:
+      case KeyCode.A: moveLeft = false; break;
+      
+      case KeyCode.DOWN:
+      case KeyCode.S: moveBackward = false; break;
+      
+      case KeyCode.RIGHT:
+      case KeyCode.D: moveRight = false; break;
 
-    switch( event.keyCode ) {
-
-      case 38: /*up*/
-      case 87: /*W*/ this.moveForward = false; break;
-
-      case 37: /*left*/
-      case 65: /*A*/ this.moveLeft = false; break;
-
-      case 40: /*down*/
-      case 83: /*S*/ this.moveBackward = false; break;
-
-      case 39: /*right*/
-      case 68: /*D*/ this.moveRight = false; break;
-
-      case 82: /*R*/ this.moveUp = false; break;
-      case 70: /*F*/ this.moveDown = false; break;
+      case KeyCode.R: moveUp = false; break;
+      case KeyCode.F: moveDown = false; break;
     }
   }
+  
+  void update(double delta) {
+    if (freeze) return;
 
-  void update(delta) {
-    var actualMoveSpeed = 0;
-    var actualLookSpeed = 0;
-    if ( this.freeze ) {
+    if (heightSpeed) {
+      var y = object.position.y.clamp(heightMin, heightMax);
+      var heightDelta = y - heightMin;
 
-      return;
-
+      autoSpeedFactor = delta * (heightDelta * heightCoef);
     } else {
-
-      if ( this.heightSpeed ) {
-        var y = THREEMath.clamp( this.object.position.y, this.heightMin, this.heightMax );
-        var heightDelta = y - this.heightMin;
-
-        this.autoSpeedFactor = delta * ( heightDelta * this.heightCoef );
-      } else {
-        this.autoSpeedFactor = 0.0;
-      }
-
-      actualMoveSpeed = delta * this.movementSpeed;
-
-      if ( this.moveForward || ( this.autoForward && !this.moveBackward ) ) this.object.translateZ( - ( actualMoveSpeed + this.autoSpeedFactor ) );
-      if ( this.moveBackward ) this.object.translateZ( actualMoveSpeed );
-
-      if ( this.moveLeft ) this.object.translateX( - actualMoveSpeed );
-      if ( this.moveRight ) this.object.translateX( actualMoveSpeed );
-
-      if ( this.moveUp ) this.object.translateY( actualMoveSpeed );
-      if ( this.moveDown ) this.object.translateY( - actualMoveSpeed );
-
-      var actualLookSpeed = delta * this.lookSpeed;
-
-      if ( !this.activeLook ) {
-
-        actualLookSpeed = 0;
-
-      }
-
-      this.lon += this.mouseX * actualLookSpeed;
-      if( this.lookVertical ) this.lat -= this.mouseY * actualLookSpeed; // * this.invertVertical?-1:1;
-
-      this.lat = Math.max( - 85, Math.min( 85, this.lat ) );
-      this.phi = ( 90 - this.lat ) * Math.PI / 180;
-      this.theta = this.lon * Math.PI / 180;
-
-      var targetPosition = this.target,
-          position = this.object.position;
-
-      targetPosition.x = position.x + 100 * Math.sin( this.phi ) * Math.cos( this.theta );
-      targetPosition.y = position.y + 100 * Math.cos( this.phi );
-      targetPosition.z = position.z + 100 * Math.sin( this.phi ) * Math.sin( this.theta );
+      autoSpeedFactor = 0.0;
     }
+
+    var actualMoveSpeed = delta * movementSpeed;
+
+    if (moveForward || (autoForward && !moveBackward)) object.translateZ(-(actualMoveSpeed + autoSpeedFactor));
+    if (moveBackward) object.translateZ(actualMoveSpeed);
+
+    if (moveLeft) object.translateX(-actualMoveSpeed);
+    if (moveRight) object.translateX(actualMoveSpeed);
+
+    if (moveUp) object.translateY(actualMoveSpeed);
+    if (moveDown) object.translateY(-actualMoveSpeed);
+
+    var actualLookSpeed = delta * lookSpeed;
+
+    if (!activeLook) actualLookSpeed = 0;
 
     var verticalLookRatio = 1;
 
-    if ( this.constrainVertical ) {
-      verticalLookRatio = Math.PI / ( this.verticalMax - this.verticalMin );
+    if (constrainVertical) {
+      verticalLookRatio = Math.PI / (verticalMax - verticalMin);
     }
 
-    this.lon += this.mouseX * actualLookSpeed;
-    if( this.lookVertical ) this.lat -= this.mouseY * actualLookSpeed * verticalLookRatio;
+    lon += mouseX * actualLookSpeed;
+    if (lookVertical) lat -= mouseY * actualLookSpeed * verticalLookRatio;
 
-    this.lat = Math.max( - 85, Math.min( 85, this.lat ) );
-    this.phi = ( 90 - this.lat ) * Math.PI / 180;
+    lat = Math.max(-85.0, Math.min(85.0, lat));
+    phi = MathUtils.degToRad(90 - lat);
 
-    this.theta = this.lon * Math.PI / 180;
+    theta = MathUtils.degToRad(lon);
 
-    if ( this.constrainVertical ) {
-      this.phi = THREEMath.mapLinear( this.phi, 0, Math.PI, this.verticalMin, this.verticalMax );
+    if (constrainVertical) {
+      phi = MathUtils.mapLinear(phi, 0, Math.PI, verticalMin, verticalMax);
     }
 
-    var targetPosition = this.target,
-        position = this.object.position;
+    var targetPosition = target,
+        position = object.position;
 
-    targetPosition.x = position.x + 100 * Math.sin( this.phi ) * Math.cos( this.theta );
-    targetPosition.y = position.y + 100 * Math.cos( this.phi );
-    targetPosition.z = position.z + 100 * Math.sin( this.phi ) * Math.sin( this.theta );
+    targetPosition.x = position.x + 100 * Math.sin(phi) * Math.cos(theta);
+    targetPosition.y = position.y + 100 * Math.cos(phi);
+    targetPosition.z = position.z + 100 * Math.sin(phi) * Math.sin(theta);
 
-    this.object.lookAt( targetPosition );
+    object.lookAt(targetPosition);
   }
 }

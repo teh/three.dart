@@ -8,37 +8,22 @@ class EventEmitterEvent {
 }
 
 class EventEmitter {
+  Map listeners = {};
 
-	var listeners;
+  addEventListener(String type, Function listener) {
+    if (!listeners.containsKey(type)) {
+      listeners[type] = [];
+    }
+    if (!listeners[type].contains(listener)) {
+      listeners[type].add(listener);
+    }
+  }
 
-	EventEmitter() : listeners = {};
+  dispatchEvent(EventEmitterEvent event) {
+    if (listeners.containsKey(event.type)) {
+      listeners[event.type].forEach((listener) => listener(event));
+    }
+  }
 
-	addEventListener( type, listener ) {
-
-		if ( listeners[ type ] == null ) {
-			listeners[ type ] = [];
-		}
-
-		if ( listeners[ type ].indexOf( listener ) == - 1 ) {
-			listeners[ type ].add( listener );
-		}
-
-	}
-
-	dispatchEvent( event ) {
-		if ( listeners[ event.type ] != null ) {
-			listeners[ event.type ].forEach((listener) => listener( event ));
-		}
-	}
-
-	removeEventListener ( type, listener ) {
-
-		var index = listeners[ type ].indexOf( listener );
-
-		if ( index != - 1 ) {
-			listeners[ type ].removeAt( index );
-		}
-
-	}
-
+  bool removeEventListener(String type, Function listener) => listeners[type].remove(listener);
 }

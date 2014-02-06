@@ -1,42 +1,30 @@
 part of three;
 
 class Bone extends Object3D {
+  SkinnedMesh skin;
+  Matrix4 skinMatrix = new Matrix4.identity();
 
-  var skin;
-  Matrix4 skinMatrix;
+  Bone(SkinnedMesh belongsToSkin) : skin = belongsToSkin, super();
 
-  Bone(this.skin) : skinMatrix = new Matrix4.identity(), super();
-
-  update( [Matrix4 parentSkinMatrix, forceUpdate = false] ) {
-
+  void update([Matrix4 parentSkinMatrix, bool forceUpdate = false]) {
     // update local
-    if ( matrixAutoUpdate ) {
-
-      // This should be <=> forceUpdate |= updateMatrix();
+    if (matrixAutoUpdate) {
       if (forceUpdate) updateMatrix();
     }
 
     // update skin matrix
-
-    if ( forceUpdate || matrixWorldNeedsUpdate ) {
-
-      if( parentSkinMatrix != null) {
-
+    if (forceUpdate || matrixWorldNeedsUpdate) {
+      if(parentSkinMatrix != null) {
         skinMatrix = parentSkinMatrix * matrix;
-
       } else {
-
         skinMatrix = matrix.clone();
-
       }
-
+      
       matrixWorldNeedsUpdate = false;
       forceUpdate = true;
-
     }
 
     // update children
     children.forEach((c) => c.update(skinMatrix, forceUpdate));
-
   }
 }

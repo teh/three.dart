@@ -1,5 +1,3 @@
-part of three;
-
 /**
  * @author mr.doob / http://mrdoob.com/
  *
@@ -7,81 +5,64 @@ part of three;
  * @author rob silverton / http://www.unwrong.com/
  */
 
+part of three;
+
 class Scene extends Object3D {
   Fog fog;
   Material overrideMaterial;
-  //bool matrixAutoUpdate;
-  List<Object3D> objects;
-  List<Light> lights;
-  List __objectsAdded;
-  List __objectsRemoved;
+  
+  bool autoUpdate = true;
+  
+  List<Light> __lights = [];
+  
+  List<Object3D> __objectsAdded = [];
+  List<Object3D> __objectsRemoved = [];
 
   Scene() {
-    // TODO: check how to call super constructor
-    // super();
-
-    fog = null;
-    overrideMaterial = null;
-
     matrixAutoUpdate = false;
-
-    objects = [];
-    lights = [];
-
-    __objectsAdded = [];
-    __objectsRemoved = [];
   }
 
-  void addObject( Object3D object ) {
-    if ( object is Light ) {
-      if ( lights.indexOf( object ) == - 1 ) {
-        lights.add( object );
+  void __addObject(Object3D object) {
+    if (object is Light) {
+      if (!__lights.contains(object)) {
+        __lights.add(object);
       }
-    } else if ( !( object is Camera || object is Bone ) ) {
-      if ( objects.indexOf( object ) == - 1 ) {
-        objects.add( object );
-        __objectsAdded.add( object );
-
-        // check if previously removed
-        int i = __objectsRemoved.indexOf( object );
-
-        if ( i != -1 ) {
-          __objectsRemoved.removeAt(i);
+      
+      if (object is DirectionalLight || object is SpotLight) {
+        if ((object as dynamic).target != null && (object as dynamic).target.parent == null) {
+          add((object as dynamic).target);
         }
       }
-    }
-
-    for ( int c = 0; c < object.children.length; c ++ ) {
-      addObject( object.children[ c ] );
-    }
-  }
-
-  void removeObject( Object3D object ) {
-    //TODO: "instanceof" replaced by "is"?
-    if ( object is Light ) {
-      int i = lights.indexOf( object );
-
-      if ( i != -1 ) {
-        lights.removeAt(i);
-      }
-    } else if ( !( object is Camera ) ) {
-      int i = objects.indexOf( object );
-
-      if( i != -1 ) {
-        objects.removeAt(i);
-        __objectsRemoved.add( object );
-
-        // check if previously added
-        var ai = __objectsAdded.indexOf( object );
-
-        if ( ai != -1 ) {
-          __objectsAdded.removeAt(ai);
-        }
+    } else if (!(object is Camera || object is Bone)) {
+      __objectsAdded.add(object);
+      
+      // check if previously removed
+      if (__objectsRemoved.contains(object)) {
+        __objectsRemoved.remove(object);
       }
     }
-
-    for ( int c = 0; c < object.children.length; c ++ ) {
-      removeObject( object.children[ c ] );
-    }
+    
+    object.children.forEach((children) => __addObject(children));
   }
+  
+  void __removeObject(Object3D object) {
+    if (object is Light) {
+      if (__lights.contains(object)) {
+        __lights.remove(object);
+      }
+
+      if (object is DirectionalLight) {
+        object.shadowCascadeArray.forEach((o) => __removeObject(o));
+      }
+    } else if (object is! Camera) {
+      __objectsRemoved.add(object);
+
+      // check if previously added
+      if (__objectsAdded.contains(object)) {
+        __objectsAdded.remove(object);
+      }
+    }
+ 
+    object.children.forEach((o) => __removeObject(o));
+  } 
 }

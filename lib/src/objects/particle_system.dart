@@ -3,22 +3,12 @@ part of three;
 class ParticleSystem extends Object3D {
   Geometry geometry;
   Material material;
-  bool sortParticles;
+  bool sortParticles = false;
 
-  ParticleSystem(this.geometry, [this.material = null]) : sortParticles = false, super() {
-  	if (material == null) {
-  		material = new ParticleBasicMaterial( color: new Math.Random().nextDouble() * 0xffffff );
-  	}
-
-  	if ( geometry != null) {
-  		// calc bound radius
-  		if( geometry.boundingSphere == null) {
-  			geometry.computeBoundingSphere();
-  		}
-  		boundRadius = geometry.boundingSphere.radius;
-  	}
-
+  ParticleSystem(Geometry geometry, [Material material]) 
+      : this.geometry = geometry != null ? geometry : new Geometry(),
+        this.material = material != null ? material : new ParticleSystemMaterial(color: MathUtils.randHex()),
+        super() {
   	frustumCulled = false;
   }
-
 }

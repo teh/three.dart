@@ -1,14 +1,106 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  * @author alteredq / http://alteredqualia.com/
  *
  * Ported to Dart from JS by:
  * @author rob silverton / http://www.unwrong.com/
  *
- * parameters = {
- *  color: <hex>,
+ */
+
+part of three;
+
+/// A material for non-shiny (Lambertian) surfaces, evaluated per vertex.
+class MeshLambertMaterial extends Material implements ITextureMaterial {
+  /// Diffuse color of the material. Default is white.
+  Color color;
+  
+  /// Ambient color of the material, multiplied by the color of the AmbientLight. 
+  /// Default is white.
+  Color ambient;
+  
+  /// Emissive (light) color of the material, essentially a solid color unaffected 
+  /// by other lighting. Default is black.
+  Color emissive;
+
+  bool wrapAround;
+  Vector3 wrapRGB;
+  
+  /// Set color texture map. Default is null.
+  Texture map;
+  
+  /// Set light map. Default is null.
+  Texture lightMap;
+  
+  /// Since this material does not have a specular component, the specular 
+  /// value affects only how much of the environment map affects the surface. 
+  /// Default is null.
+  Texture specularMap;
+  
+  /// Set environmental map. Default is null.
+  Texture envMap;
+  
+  /// How to combine the result of the surface's color with the environment map, if any.
+  /// Options are MULTIPLY (default), MIX_OPERATION, ADD_OPERATION. 
+  /// If mix is chosen, the reflectivity is used to blend between the two colors.
+  int combine;
+  
+  /// How much the environment map affects the surface; also see "combine".
+  double reflectivity;
+  
+  /// The index of refraction for an environment map using CubeRefractionMapping. 
+  /// Default is 0.98.
+  double refractionRatio;
+
+  /// Define whether the material color is affected by global fog settings. 
+  /// Default is true. This setting might not have any effect when used 
+  /// with certain renderers. For example, it is ignored with the Canvas renderer, 
+  /// but does work with the WebGL renderer.
+  bool fog;
+  
+  /// How the triangles of a curved surface are rendered: as a 
+  /// smooth surface, as flat separate facets, or no shading at all.
+  /// Options are SMOOTH_SHADING (default), FLAT_SHADING, NO_SHADING.
+  int shading;
+  
+  /// Whether the triangles' edges are displayed instead of surfaces. 
+  /// Default is false.
+  bool wireframe;
+  
+  /// Line thickness for wireframe mode. Default is 1.0.
+  /// Due to limitations in the ANGLE layer, on Windows platforms 
+  /// linewidth will always be 1 regardless of the set value.
+  double wireframeLinewidth;
+  
+  /// Define appearance of line ends. Possible values are "butt", "round" 
+  /// and "square". Default is 'round'. This setting might not have any 
+  /// effect when used with certain renderers. For example, it is ignored 
+  /// with the WebGL renderer, but does work with the Canvas renderer.
+  String wireframeLinecap;
+  
+  /// Define appearance of line joints. Possible values are "round", "bevel" and "miter". 
+  /// Default is 'round'. This setting might not have any effect when used with 
+  /// certain renderers. For example, it is ignored with the WebGL renderer, 
+  /// but does work with the Canvas renderer.
+  String wireframeLinejoin;
+  
+  /// Define whether the material uses vertex colors, or not. 
+  /// Default is false. This setting might not have any effect when used 
+  /// with certain renderers. For example, it is ignored with the Canvas 
+  /// renderer, but does work with the WebGL renderer.
+  int vertexColors;
+
+  /// Define whether the material uses skinning. Default is false.
+  bool skinning;
+  
+  /// Define whether the material uses morphTargets. Default is false.
+  bool morphTargets;
+  
+  /// Define whether the material uses morphNormals. Default is false.
+  bool morphNormals;
+
+  /**
+   * #parameters
+   ** color: <hex>,
  *  ambient: <hex>,
  *  opacity: <float>,
  *
@@ -32,119 +124,86 @@ part of three;
  *  skinning: <bool>,
  *
  *  fog: <bool>
- * }
- */
+   */
+  MeshLambertMaterial({// MeshLambertMaterial
+                       this.map,
 
-class MeshLambertMaterial extends Material implements ITextureMapMaterial
-{
-  Map _parameters;
+                       int color: 0xffffff, // diffuse
+                       int ambient: 0xffffff,
+                       int emissive: 0x000000,
 
-  Color color;
-  Color ambient;
-  Color emissive;
+                       this.wrapAround: false,
+                       Vector3 wrapRGB,
 
-  bool wrapAround;
-  Vector3 wrapRGB;
-  Texture map;
-  Texture lightMap;
-  Texture specularMap;
-  var envMap; //TODO: TextureCube?
-  int combine;
-  num reflectivity;
-  num refractionRatio;
+                       this.lightMap,
+                       this.specularMap,
+                       this.envMap,
 
-  int shading;
-  bool wireframe;
-  num wireframeLinewidth;
-  String wireframeLinecap;
-  String wireframeLinejoin;
+                       this.combine: MULTIPLY_OPERATION,
+                       this.reflectivity: 1.0,
+                       this.refractionRatio: 0.98,
+                       
+                       this.fog: true,
 
-  bool skinning;
-  bool morphTargets, morphNormals;
+                       this.shading: SMOOTH_SHADING,
 
-  int vertexColors;
-  bool fog;
+                       this.wireframe: false,
+                       this.wireframeLinewidth: 1.0,
+                       this.wireframeLinecap: 'round',
+                       this.wireframeLinejoin: 'round',
+                       
+                       this.vertexColors: NO_COLORS,
 
-  MeshLambertMaterial( { // MeshLambertMaterial
+                       this.skinning: false,
+                       this.morphTargets: false,
+                       this.morphNormals: false,
 
-                         this.map,
+                       // Material
+                       String name: '',
+                       int side: FRONT_SIDE,
 
-                         num color: 0xffffff, //emissive
-                         num ambient: 0xffffff,
-                         num emissive: 0x000000,
+                       double opacity: 1.0,
+                       bool transparent: false,
 
-                         this.wrapAround: false,
-                         Vector3 wrapRGB,
+                       int blending: NORMAL_BLENDING,
+                       int blendSrc: SRC_ALPHA_FACTOR,
+                       int blendDst: ONE_MINUS_SRC_ALPHA_FACTOR,
+                       int blendEquation: ADD_EQUATION,
 
-                         this.lightMap,
-                         this.specularMap,
-                         this.envMap,
+                       bool depthTest: true,
+                       bool depthWrite: true,
 
-                         this.combine: MultiplyOperation,
-                         this.reflectivity: 1,
-                         this.refractionRatio: 0.98,
+                       bool polygonOffset: false,
+                       int polygonOffsetFactor: 0,
+                       int polygonOffsetUnits: 0,
 
-                         this.shading: SmoothShading,
+                       int alphaTest: 0,
 
-                         this.vertexColors: NoColors,
+                       int overdraw: 0,
 
-                         this.fog: true,
-
-                         this.wireframe: false,
-                         this.wireframeLinewidth: 1,
-                         this.wireframeLinecap: 'round',
-                         this.wireframeLinejoin: 'round',
-
-                         this.skinning: false,
-                         this.morphTargets: false,
-                         this.morphNormals: false,
-
-                         // Material
-                         name: '',
-                         side: FrontSide,
-
-                         opacity: 1,
-                         transparent: false,
-
-                         blending: NormalBlending,
-                         blendSrc: SrcAlphaFactor,
-                         blendDst: OneMinusSrcAlphaFactor,
-                         blendEquation: AddEquation,
-
-                         depthTest: true,
-                         depthWrite: true,
-
-                         polygonOffset: false,
-                         polygonOffsetFactor: 0,
-                         polygonOffsetUnits: 0,
-
-                         alphaTest: 0,
-
-                         overdraw: false,
-
-                         visible: true })
-                         :
-                           this.color = new Color(color),
-                           this.ambient = new Color(ambient),
-                           this.emissive = new Color(emissive),
-
-                           this.wrapRGB = wrapRGB == null ? new Vector3( 1.0, 1.0, 1.0 ) : wrapRGB,
-
-                           super(  name: name,
-                                   side: side,
-                                   opacity: opacity,
-                                   transparent: transparent,
-                                   blending: blending,
-                                   blendSrc: blendSrc,
-                                   blendDst: blendDst,
-                                   blendEquation: blendEquation,
-                                   depthTest: depthTest,
-                                   depthWrite: depthWrite,
-                                   polygonOffset: polygonOffset,
-                                   polygonOffsetFactor: polygonOffsetFactor,
-                                   polygonOffsetUnits: polygonOffsetUnits,
-                                   alphaTest: alphaTest,
-                                   overdraw: overdraw,
-                                   visible: visible );
-
+                       visible: true})
+      : this.color = new Color(color),
+        this.ambient = new Color(ambient),
+        this.emissive = new Color(emissive),
+        
+        this.wrapRGB = wrapRGB == null ? new Vector3.one() : wrapRGB,
+            
+        super(name: name,
+              side: side,
+              opacity: opacity,
+              transparent: transparent,
+              blending: blending,
+              blendSrc: blendSrc,
+              blendDst: blendDst,
+              blendEquation: blendEquation,
+              depthTest: depthTest,
+              depthWrite: depthWrite,
+              polygonOffset: polygonOffset,
+              polygonOffsetFactor: polygonOffsetFactor,
+              polygonOffsetUnits: polygonOffsetUnits,
+              alphaTest: alphaTest,
+              overdraw: overdraw,
+              visible: visible);
+        
+  //TODO Add clone.
 }

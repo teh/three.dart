@@ -1,169 +1,115 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  * based on http://papervision3d.googlecode.com/svn/trunk/as3/trunk/src/org/papervision3d/objects/primitives/Cube.as
  *
  * Ported to Dart from JS by:
  * @author rob silverton / http://www.unwrong.com/
+ * 
+ * based on r63
  */
 
+part of three;
+
+/// CubeGeometry is the quadrilateral primitive geometry class. It is typically used 
+/// for creating a cube or irregular quadrilateral of the dimensions provided with 
+/// the 'width', 'height', and 'depth' constructor arguments.
 class CubeGeometry extends Geometry {
-  //List materials;
-  CubeGeomSides _sides;
-  int segmentsWidth;
-  int segmentsHeight;
-  int segmentsDepth;
-
-  /**
-   * [materialOrList] is a [Material] or a [List] of [Material]. */
-  CubeGeometry( double width, double height, double depth, [this.segmentsWidth = 1,
-                                                   this.segmentsHeight = 1,
-                                                   this.segmentsDepth = 1,
-                                                   materialOrList,
-                                                   List sides] )
-                                                   : super() {
-
-    double width_half = width / 2,
-        height_half = height / 2,
-        depth_half = depth / 2;
-
-    int mpx, mpy, mpz, mnx, mny, mnz;
-
-    if ( materialOrList != null ) {
-      if ( materialOrList is List ) {
-        materials = materialOrList;
-      } else {
-        materials = [];
-
-        for ( int i = 0; i < 6; i ++ ) {
-          materials.add( materialOrList );
-        }
-      }
-
-      mpx = 0; mnx = 1; mpy = 2; mny = 3; mpz = 4; mnz = 5;
-
-    } else {
-      materials = [];
-    }
-
-    //_sides = { "px": true, "nx": true, "py": true, "ny": true, "pz": true, "nz": true };
-    _sides = new CubeGeomSides();
-
-    //TODO: not sure if this is the correct use of "dynamic"
-    if ( sides != null ) {
-      for ( var s in sides ) {
-        if ( (_sides as dynamic)[ s ] != null ) {
-          (_sides as dynamic)[ s ] = sides[ s ];
-        }
-      }
-    }
-
-    if (_sides.px)  buildPlane( 'z', 'y', -1.0, -1.0, depth, height, width_half, mpx ); // px
-    if (_sides.nx)  buildPlane( 'z', 'y',  1.0, -1.0, depth, height, - width_half, mnx ); // nx
-    if (_sides.py)  buildPlane( 'x', 'z',  1.0,  1.0, width, depth, height_half, mpy ); // py
-    if (_sides.ny)  buildPlane( 'x', 'z',  1.0, -1.0, width, depth, - height_half, mny ); // ny
-    if (_sides.pz)  buildPlane( 'x', 'y',  1.0, -1.0, width, height, depth_half, mpz ); // pz
-    if (_sides.nz)  buildPlane( 'x', 'y', -1.0, -1.0, width, height, - depth_half, mnz ); // nz
-
+  final double width;
+  final double height;
+  final double depth;
+  final int widthSegments;
+  final int heightSegments;
+  final int depthSegments;
+  
+  /// ##Parameters
+  /// * [width]: Width of the sides on the X axis.
+  /// * [height]: Height of the sides on the Y axis.
+  /// * [depth]: Depth of the sides on the Z axis.
+  /// * [widthSegments]: Number of segmented faces along the width of the sides. Default is 1.
+  /// * [heightSegments]: Number of segmented faces along the height of the sides. Default is 1.
+  /// * [depthSegments]: Number of segmented faces along the depth of the sides. Default is 1.
+  CubeGeometry(this.width, 
+               this.height, 
+               this.depth, 
+              [this.widthSegments = 1, 
+               this.heightSegments = 1, 
+               this.depthSegments = 1]) : super() {
+    var width_half = width / 2;
+    var height_half = height / 2;
+    var depth_half = depth / 2;
+    
+    _buildPlane('z', 'y', -1, -1, depth, height,  width_half,  0); // px
+    _buildPlane('z', 'y',  1, -1, depth, height, -width_half,  1); // nx
+    _buildPlane('x', 'z',  1,  1, width, depth,   height_half, 2); // py
+    _buildPlane('x', 'z',  1, -1, width, depth,  -height_half, 3); // ny
+    _buildPlane('x', 'y',  1, -1, width, height,  depth_half,  4); // pz
+    _buildPlane('x', 'y', -1, -1, width, height, -depth_half,  5); // nz
+    
     computeCentroids();
     mergeVertices();
   }
+  
+  void _buildPlane(String u, String v, int udir, int vdir, double width, double height, double depth, int materialIndex) {
+    var w,
+        gridX = widthSegments,
+        gridY = heightSegments,
+        width_half = width / 2,
+        height_half = height / 2,
+        offset = vertices.length;
+    
+    var m = {"x": 0, "y": 1, "z": 2};
 
-  void buildPlane( String u, String v, double udir, double vdir, double width, double height, double depth, int material ) {
-    String w;
-    int gridX = ( segmentsWidth != null ) ? segmentsWidth : 1;
-    int gridY = ( segmentsHeight != null ) ? segmentsHeight : 1;
-    double width_half = width / 2.0;
-    double height_half = height / 2.0;
-    int offset = vertices.length;
-
-    if ( ( u == 'x' && v == 'y' ) || ( u == 'y' && v == 'x' ) ) {
+    if ((u == 'x' && v == 'y') || (u == 'y' && v == 'x')) {
       w = 'z';
-    } else if ( ( u == 'x' && v == 'z' ) || ( u == 'z' && v == 'x' ) ) {
+    } else if ((u == 'x' && v == 'z') || (u == 'z' && v == 'x')) {
       w = 'y';
-      gridY = ( segmentsDepth != null ) ? segmentsDepth : 1;
-    } else if ( ( u == 'z' && v == 'y' ) || ( u == 'y' && v == 'z' ) ) {
+      gridY = depthSegments;
+    } else if ((u == 'z' && v == 'y') || (u == 'y' && v == 'z')) {
       w = 'x';
-      gridX = ( segmentsDepth != null ) ? segmentsDepth : 1;
+      gridX = depthSegments;
     }
 
-    num gridX1 = gridX + 1,
-    gridY1 = gridY + 1,
-    segment_width = width / gridX,
-    segment_height = height / gridY;
-    Vector3 normal = new Vector3.zero();
+    var gridX1 = gridX + 1,
+        gridY1 = gridY + 1,
+        segment_width = width / gridX,
+        segment_height = height / gridY;
+        
+    var normal = new Vector3.zero();
+    normal[m[w]] = depth > 0 ? 1.0 : - 1.0;
 
-    //TODO: find out how to do this sort of casting in Dart...
-    // normal.dynamic[ w ] = depth > 0 ? 1 : - 1;
+    for (var iy = 0; iy < gridY1; iy ++) {
+      for (var ix = 0; ix < gridX1; ix ++) {
+        var vector = new Vector3.zero();
+        vector[m[u]] = (ix * segment_width - width_half) * udir;
+        vector[m[v]] = (iy * segment_height - height_half) * vdir;
+        vector[m[w]] = depth;
 
-    if ( w == 'x' ) {        normal.x = depth > 0 ? 1.0 : - 1.0;
-    } else if ( w == 'y' ) { normal.y = depth > 0 ? 1.0 : - 1.0;
-    } else if ( w == 'z' )   normal.z = depth > 0 ? 1.0 : - 1.0;
-
-    for ( int iy = 0; iy < gridY1; iy ++ )  {
-      for ( int ix = 0; ix < gridX1; ix ++ ) {
-        Vector3 vector = new Vector3.zero();
-        //TODO: find out how to do this sort of casting in Dart...
-//        vector[ u ] = ( ix * segment_width - width_half ) * udir;
-//        vector[ v ] = ( iy * segment_height - height_half ) * vdir;
-//        vector[ w ] = depth;
-
-        if ( u == 'x' ) {        vector.x = ( ix * segment_width - width_half ) * udir;
-        } else if ( u == 'y' ) {   vector.y = ( ix * segment_width - width_half ) * udir;
-        } else if ( u == 'z' )   vector.z = ( ix * segment_width - width_half ) * udir;
-
-        if ( v == 'x' ) {        vector.x = ( iy * segment_height - height_half ) * vdir;
-        } else if ( v == 'y' ) {   vector.y = ( iy * segment_height - height_half ) * vdir;
-        } else if ( v == 'z' )   vector.z = ( iy * segment_height - height_half ) * vdir;
-
-        if ( w == 'x' ) {        vector.x = depth;
-        } else if ( w == 'y' ) {   vector.y = depth;
-        } else if ( w == 'z' )   vector.z = depth;
-
-        vertices.add( vector );
+        vertices.add(vector);
       }
     }
 
-    for ( int iy = 0; iy < gridY; iy++ ) {
-      for ( int ix = 0; ix < gridX; ix++ ) {
-        num a = ix + gridX1 * iy;
-        num b = ix + gridX1 * ( iy + 1 );
-        num c = ( ix + 1 ) + gridX1 * ( iy + 1 );
-        num d = ( ix + 1 ) + gridX1 * iy;
+    for (var iy = 0; iy < gridY; iy++) {
+      for (var ix = 0; ix < gridX; ix++) {
+        var a = ix + gridX1 * iy;
+        var b = ix + gridX1 * (iy + 1);
+        var c = (ix + 1) + gridX1 * (iy + 1);
+        var d = (ix + 1) + gridX1 * iy;
 
-        Face4 face = new Face4( a + offset, b + offset, c + offset, d + offset );
-        face.normal.setFrom(normal);
-        face.vertexNormals.addAll( [normal.clone(), normal.clone(), normal.clone(), normal.clone()] );
-        face.materialIndex = material;
+        var uva = new Vector2(ix / gridX, 1 - iy / gridY);
+        var uvb = new Vector2(ix / gridX, 1 - (iy + 1) / gridY);
+        var uvc = new Vector2((ix + 1) / gridX, 1 - (iy + 1) / gridY);
+        var uvd = new Vector2((ix + 1) / gridX, 1 - iy / gridY);
 
-        faces.add( face );
+        var face = new Face3(a + offset, b + offset, d + offset, new List.filled(3, normal.clone()), null, materialIndex)
+        ..normal.setFrom(normal);
+        faces.add(face);
+        faceVertexUvs[0].add([uva, uvb, uvd]);
 
-        List faceVertexUV = faceVertexUvs[ 0 ];
-        List newUVs = new List();
-        newUVs.addAll([
-                       new UV( ix / gridX, iy / gridY ),
-                       new UV( ix / gridX, ( iy + 1 ) / gridY ),
-                       new UV( ( ix + 1 ) / gridX, ( iy + 1 ) / gridY ),
-                       new UV( ( ix + 1 ) / gridX, iy / gridY )
-                     ]);
-        faceVertexUV.add( newUVs );
+        face = new Face3(b + offset, c + offset, d + offset, new List.filled(3, normal.clone()), null, materialIndex)
+        ..normal.setFrom(normal);
+        faces.add(face);
+        faceVertexUvs[0].add([uvb.clone(), uvc, uvd.clone()]);
       }
     }
   }
 }
-
-//_sides = { "px": true, "nx": true, "py": true, "ny": true, "pz": true, "nz": true };
-class CubeGeomSides{
-  bool px, nx, py, ny, pz, nz;
-
-  CubeGeomSides( {this.px: true,
-                  this.nx: true,
-                  this.py: true,
-                  this.ny: true,
-                  this.pz: true,
-                  this.nz: true} );
-}
-
-
-

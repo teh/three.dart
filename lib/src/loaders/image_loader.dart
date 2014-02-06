@@ -1,27 +1,32 @@
 part of three;
 
-class ImageLoader extends EventEmitter {
-
+class ImageLoader {
+	var manager;
 	String crossOrigin;
 
-	ImageLoader() : crossOrigin = null, super();
+	ImageLoader([manager]) 
+	    : manager = manager != null ? manager : DefaultLoadingManager;
 
-	load( String url, [ImageElement image = null] ) {
+	void load(String url, Function onLoad, {Function onError}) {
+	  var image = new ImageElement()
+	  ..src = url;
+	  
+	  if (onLoad != null) {
+	    image.onLoad.listen((_) {
+	      manager.itemEnd(url);
+	      onLoad(image);
+	    });
+	  }
+	  
+	  // on progress?
+	 
+	  if (onError != null) {
+      image.onError.listen((_) => manager.itemEnd(url));
+      onLoad(this);
+    }
 
-		if ( image == null ) image = new ImageElement();
-
-		image.onLoad.listen((_) {
-			dispatchEvent( new EventEmitterEvent(type: 'load', content: image) );
-		});
-
-		image.onError.listen( (_) {
-			dispatchEvent( new EventEmitterEvent(type: 'error', message: "Couldn\'t load URL [$url]" ) );
-		});
-
-		if ( crossOrigin != null ) image.crossOrigin = crossOrigin;
-
-		image.src = url;
-
+		if (crossOrigin != null) image.crossOrigin = crossOrigin;
+		
+		manager.itemStart(url);
 	}
-
 }

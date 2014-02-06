@@ -1,238 +1,169 @@
+/*
+ * @author zz85 / http://www.lab4games.net/zz85/blog
+ */
+
 part of three;
 
-/**************************************************************
- *	Abstract Curve base class
- **************************************************************/
-abstract class Curve<V> {
+/**
+ * Extensible curve object.
+ *
+ * ## Subclasses of [Curve]
+ * 
+ * ### 2d classes
+ * * [LineCurve]
+ * * [QuadraticBezierCurve]
+ * * [CubicBezierCurve]
+ * * [SplineCurve]
+ * * [ArcCurve]
+ * * [EllipseCurve]
+ *
+ * ### 3d classes
+ * * [LineCurve3]
+ * * [QuadraticBezierCurve3]
+ * * [CubicBezierCurve3]
+ * * [SplineCurve3]
+ * * [ClosedSplineCurve3]
+ *
+ * A series of curves can be represented as a [CurvePath]
+ *
+ */
+class Curve<V> {
+  int _arcLengthDivisions;
+  List cacheArcLengths;
+  bool needsUpdate;
+  
+  Function _getPoint;
+  
+  Curve();
+  
+  Curve.create(this._getPoint);
 
-  int _arcLengthDivisions = null;
-  List cacheArcLengths = null;
-  bool needsUpdate = false;
+  /// Returns a vector for point t of the curve where t is between 0 and 1.
+  V getPoint(double t) => _getPoint(t);
 
-	// Virtual base class method to overwrite and implement in subclasses
-	//	- t [0 .. 1]
-  V getPoint(t);
+  /// Returns a vector for point at relative position in curve according to arc length.
+  V getPointAt(double u) => getPoint(getUtoTmapping(u));
 
-	// Get point at relative position in curve according to arc length
-	// - u [0 .. 1]
-  V getPointAt( u ) {
-		var t = getUtoTmapping( u );
-		return getPoint( t );
-	}
+	/// Get sequence of points using getPoint(t).
+	List<V> getPoints([int divisions = 5, bool closedPath = false]) =>
+	    new List.generate(divisions + 1, (d) => getPoint(d / divisions));
 
-	// Get sequence of points using getPoint( t )
-  // TODO(nelsonsilva) - closedPath is only used in Path
-	List<V> getPoints( [num divisions = null, closedPath = false] ) {
+	/// Get sequence of equi-spaced points using getPointAt(u).
+	List<V> getSpacedPoints([int divisions = 5, bool closedPath = false]) =>
+	    new List.generate(divisions + 1, (d) => getPointAt(d / divisions));
+	
+	/// Get total curve arc length.
+	double get length => getLengths().last;
 
-	  if (divisions == null) divisions = 5;
-
-		var d, pts = [];
-
-		for ( d = 0; d <= divisions; d ++ ) {
-			pts.add( this.getPoint( d / divisions ) );
+	/// Get list of cumulative segment lengths.
+	List<double> getLengths([int divisions]) {
+		if (divisions == null) {
+		  divisions = _arcLengthDivisions != null ? _arcLengthDivisions : 200;
 		}
 
-		return pts;
-	}
-
-	// Get sequence of points using getPointAt( u )
-  // TODO(nelsonsilva) - closedPath is only used in Path
-	List<V> getSpacedPoints( [num divisions = 5, closedPath = false] ) {
-
-
-		var d, pts = [];
-
-		for ( d = 0; d <= divisions; d ++ ) {
-			pts.add( this.getPointAt( d / divisions ) );
-		}
-
-		return pts;
-	}
-
-	 // Get sequence of points using getPointAt( u )
-  // TODO(tiagocardoso) - closedPath is only used in Path
-  List<V> getUPoints( [List uList , closedPath = false] ) {
-    var pts = [];
-
-    for ( var u in uList ) {
-      pts.add( this.getPointAt( u ) );
-    }
-
-    return pts;
-  }
-
-
-	// Get total curve arc length
-	num get length => getLengths().last;
-
-	// Get list of cumulative segment lengths
-	List getLengths( {num divisions: null} ) {
-
-		if (divisions == null) divisions = (_arcLengthDivisions != null) ? (_arcLengthDivisions): 200;
-
-		if ( cacheArcLengths != null
-			&& ( cacheArcLengths.length == divisions + 1 )
-			&& !needsUpdate) {
-
-			//console.log( "cached", this.cacheArcLengths );
+		if (cacheArcLengths != null && 
+		    cacheArcLengths.length == divisions + 1 && 
+		    !needsUpdate) {
+			// print("cached [$cacheArcLengths]"); takes way too long to complete.
 			return cacheArcLengths;
 		}
 
 		needsUpdate = false;
-
+		
 		var cache = [];
-		var current;
-		var last = getPoint( 0.0 );
+		var last = getPoint(0.0);
 		var sum = 0;
 
-		cache.add( 0 );
+		cache.add(0.0);
 
-		for ( var p = 1; p <= divisions; p ++ ) {
-
-			current = getPoint ( p / divisions );
-
-			var distance;
-
-			// TODO(nelsonsilva) - Must move distanceTo to IVector interface os create a new IHasDistance
-			if (current is Vector3) {
-			  distance = (current as Vector3).absoluteError( last as Vector3 );
-			} else {
-        distance = (current as Vector2).absoluteError( last as Vector2);
-      }
-
-			sum += distance;
-			cache.add( sum );
+		for (var p = 1; p <= divisions; p++) {
+			var current = getPoint(p / divisions);
+			sum += (current as dynamic).distanceTo(last);
+			cache.add(sum);
 			last = current;
-
 		}
 
 		cacheArcLengths = cache;
-
-		return cache; // { sums: cache, sum:sum }; Sum is in the last element.
+		return cache;
 	}
 
-
-	updateArcLengths() {
+	/// Update the cumlative segment distance cache
+	void updateArcLengths() {
 		needsUpdate = true;
 		getLengths();
 	}
 
-	// Given u ( 0 .. 1 ), get a t to find p. This gives you points which are equi distance
-	getUtoTmapping( u, {distance: null} ) {
-
+	/// Given u (0 .. 1), get a t to find p. This gives you points which are equidistant.
+	double getUtoTmapping(double u, [double distance]) {
 		var arcLengths = getLengths();
 
-		int i = 0, il = arcLengths.length;
-
-		var targetArcLength; // The targeted u distance value to get
+		var i = 0, il = arcLengths.length,
+		    targetArcLength;
 
 		if (distance != null) {
 			targetArcLength = distance;
 		} else {
-			targetArcLength = u * arcLengths[ il - 1 ];
+			targetArcLength = u * arcLengths[arcLengths.length - 1];
 		}
-
-		//var time = Date.now();
-
-		// binary search for the index with largest value smaller than target u distance
 
 		var low = 0, high = il - 1, comparison;
 
-		while ( low <= high ) {
+		while (low <= high) {
+			i = (low + (high - low) / 2).floor().toInt();
 
-			i = ( low + ( high - low ) / 2 ).floor().toInt(); // less likely to overflow, though probably not issue here, JS doesn't really have integers, all numbers are floats
+			comparison = arcLengths[i] - targetArcLength;
 
-			comparison = arcLengths[ i ] - targetArcLength;
-
-			if ( comparison < 0 ) {
-
+			if (comparison < 0) {
 				low = i + 1;
 				continue;
-
-			} else if ( comparison > 0 ) {
-
+			} else if (comparison > 0) {
 				high = i - 1;
 				continue;
-
 			} else {
-
 				high = i;
 				break;
-
-				// DONE
-
 			}
-
 		}
 
 		i = high;
 
-		//console.log('b' , i, low, high, Date.now()- time);
-
-		if ( arcLengths[ i ] == targetArcLength ) {
-
-			var t = i / ( il - 1 );
+		if (arcLengths[i] == targetArcLength) {
+			var t = i / (il - 1);
 			return t;
-
 		}
 
-		// we could get finer grain at lengths, or use simple interpolatation between two points
+		var lengthBefore = arcLengths[i];
+    var lengthAfter = arcLengths[i + 1];
 
-		var lengthBefore = arcLengths[ i ];
-	    var lengthAfter = arcLengths[ i + 1 ];
+    var segmentLength = lengthAfter - lengthBefore;
+    var segmentFraction = (targetArcLength - lengthBefore) / segmentLength;
 
-	    var segmentLength = lengthAfter - lengthBefore;
-
-	    // determine where we are between the 'before' and 'after' points
-
-	    var segmentFraction = ( targetArcLength - lengthBefore ) / segmentLength;
-
-	    // add that fractional amount to t
-
-	    var t = ( i + segmentFraction ) / ( il -1 );
+    var t = (i + segmentFraction) / (il -1);
 
 		return t;
 	}
 
-
-	// Returns a unit vector tangent at t
-	// In case any sub curve does not implement its tangent / normal finding,
-	// we get 2 points with a small delta and find a gradient of the 2 points
-	// which seems to make a reasonable approximation
-	V getTangent( t ) {
-
+  /// Returns a unit vector tangent at t. If the subclassed curve do not implement its 
+  /// tangent derivation, 2 points a small delta apart will be used to find its gradient 
+  /// which seems to give a reasonable approximation.
+	V getTangent(double t) {
 		var delta = 0.0001;
 		var t1 = t - delta;
 		var t2 = t + delta;
-
+		
 		// Capping in case of danger
+		if (t1 < 0) t1 = 0.0;
+		if (t2 > 1) t2 = 1.0;
 
-		if ( t1 < 0 ) t1 = 0;
-		if ( t2 > 1 ) t2 = 1;
+		var pt1 = getPoint(t1);
+		var pt2 = getPoint(t2);
 
-		var pt1 = getPoint( t1 );
-		var pt2 = getPoint( t2 );
-
-		var vec = pt2 - pt1;
-		return vec.normalize();
+		return (pt2 - pt1).normalize();
 	}
 
-	V getTangentAt( u ) {
-		var t = getUtoTmapping( u );
-		return getTangent( t );
-	}
-
+	/// Returns tangent at equidistant point u on the curve.
+	V getTangentAt(u) => getTangent(getUtoTmapping(u));
 }
 
-abstract class Curve2D extends Curve<Vector2> {
-  // In 2D space, there are actually 2 normal vectors,
-  // and in 3D space, infinte
-  // TODO this should be depreciated.
-  Vector2 getNormalVector( t ) {
-    var vec = this.getTangent( t );
-    return new Vector2( -vec.y , vec.x );
-  }
-}
-
-abstract class Curve3D extends Curve<Vector3> {
-}
+class Curve2D extends Curve<Vector2> {}
+class Curve3D extends Curve<Vector3> {}

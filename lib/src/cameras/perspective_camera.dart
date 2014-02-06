@@ -1,16 +1,17 @@
-part of three;
-
-/**
+/*
  * @author mr.doob / http://mrdoob.com/
  * @author greggman / http://games.greggman.com/
  * @author zz85 / http://www.lab4games.net/zz85/blog
  *
  * Ported to Dart from JS by:
  * @author rob silverton / http://www.unwrong.com/
+ * 
+ * based on r63
  */
 
-class PerspectiveCamera extends Camera {
+part of three;
 
+class PerspectiveCamera extends Camera {
   double fov;
   double aspect;
 
@@ -21,9 +22,8 @@ class PerspectiveCamera extends Camera {
   double _width;
   double _height;
 
-
-  PerspectiveCamera( [this.fov = 50.0, this.aspect = 1.0, near = 0.1, far = 2000.0] )
-    : super(near, far){
+  PerspectiveCamera([this.fov = 50.0, this.aspect = 1.0, double near = 0.1, double far = 2000.0])
+      : super(near, far) {
 
     updateProjectionMatrix();
   }
@@ -33,16 +33,12 @@ class PerspectiveCamera extends Camera {
    * 35mm (fullframe) camera is used if frame size is not specified;
    * Formula based on http://www.bobatkins.com/photography/technical/field_of_view.html
    */
+  void setLens(double focalLength, double frameSize) {
+    frameSize = frameSize != null ? frameSize : 24.0; // 36x24mm
 
-  void setLens( double focalLength, double frameSize ) {
-    frameSize = frameSize != null ? frameSize : 43.25; // 36x24mm
-
-    fov = 2.0 * Math.atan( frameSize / ( focalLength * 2.0 ) );
-    fov = 180.0 / Math.PI * fov;
-
+    fov = 2.0 * MathUtils.radToDeg(Math.atan(frameSize / (focalLength * 2.0)));
     updateProjectionMatrix();
   }
-
 
   /**
    * Sets an offset in a larger frustum. This is useful for multi-window or
@@ -66,21 +62,25 @@ class PerspectiveCamera extends Camera {
    *
    *   --A--
    *   camera.setOffset( fullWidth, fullHeight, w * 0, h * 0, w, h );
+   *   
    *   --B--
    *   camera.setOffset( fullWidth, fullHeight, w * 1, h * 0, w, h );
+   *   
    *   --C--
    *   camera.setOffset( fullWidth, fullHeight, w * 2, h * 0, w, h );
+   *  
    *   --D--
    *   camera.setOffset( fullWidth, fullHeight, w * 0, h * 1, w, h );
+   *  
    *   --E--
    *   camera.setOffset( fullWidth, fullHeight, w * 1, h * 1, w, h );
+   *   
    *   --F--
    *   camera.setOffset( fullWidth, fullHeight, w * 2, h * 1, w, h );
    *
    *   Note there is no reason monitors have to be the same size or in a grid.
    */
-
-  void setViewOffset( double fullWidth, double fullHeight, double x, double y, double width, double height ) {
+  void setViewOffset(double fullWidth, double fullHeight, double x, double y, double width, double height) {
     _fullWidth = fullWidth;
     _fullHeight = fullHeight;
     _x = x;
@@ -91,26 +91,30 @@ class PerspectiveCamera extends Camera {
     updateProjectionMatrix();
   }
 
-
   void updateProjectionMatrix() {
-    if ( _fullWidth != null ) {
-      double aspect = _fullWidth / _fullHeight;
-      double top = Math.tan( fov * Math.PI / 360.0 ) * near;
-      double bottom = -top;
-      double left = aspect * bottom;
-      double right = aspect * top;
-      double width = ( right - left ).abs();
-      double height = ( top - bottom ).abs();
-
-      setFrustumMatrix(projectionMatrix,
-        left + _x * width / _fullWidth,
-        left + ( _x + width ) * width / _fullWidth,
-        top - ( _y + height ) * height / _fullHeight,
-        top - _y * height / _fullHeight,
-        near,
-        far );
+    if (_fullWidth != null) {
+      var aspect = _fullWidth / _fullHeight,
+          top = Math.tan(fov * Math.PI / 360.0) * near,
+          bottom = -top,
+          left = aspect * bottom,
+          right = aspect * top,
+          width = (right - left).abs(),
+          height = (top - bottom).abs();
+      
+      projectionMatrix.makeFrustum(
+          left + _x * width / _fullWidth,
+          left + (_x + width) * width / _fullWidth,
+          top - (_y + height) * height / _fullHeight,
+          top - _y * height / _fullHeight,
+          near, far);
     } else {
-      projectionMatrix = makePerspectiveMatrix(fov * (Math.PI / 180), aspect, near, far);
+      projectionMatrix = new Matrix4.perspective(fov, aspect, near, far);
     }
+  }
+  
+  PerspectiveCamera clone([PerspectiveCamera camera, bool recursive = false]) {
+    camera = new PerspectiveCamera(fov, aspect, near, far);
+    super.clone(camera, recursive);
+    return camera;
   }
 }
