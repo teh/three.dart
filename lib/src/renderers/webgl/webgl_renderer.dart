@@ -1065,7 +1065,7 @@ class WebGLRenderer implements Renderer {
     }
 
     if (geometry.lineDistancesNeedUpdate) {
-      lineDistanceArray = new List.from(geometry.lineDistances);
+      lineDistanceArray = new Float32List.fromList(geometry.lineDistances);
 
       _gl.bindBuffer(gl.ARRAY_BUFFER, geometry.__webglLineDistanceBuffer);
       _gl.bufferDataTyped(gl.ARRAY_BUFFER, lineDistanceArray, hint);
