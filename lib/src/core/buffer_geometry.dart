@@ -82,7 +82,7 @@ class BufferGeometry implements IGeometry {
 	  
 	  boundingSphere = new Sphere.fromPoints(
 	      new List.generate(positions.length, (i) =>
-	          new Vector3.array(positions, i * 3))); 
+	          new Vector3.array(positions, (i/3).toInt()))); 
 	}
 
 	void computeVertexNormals() {

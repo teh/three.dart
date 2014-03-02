@@ -2004,7 +2004,7 @@ class WebGLRenderer implements Renderer {
           if (attributePointer >= 0) {
             if (attributeItem != null) {
               var attributeSize = attributeItem.itemSize;
-              _gl.bindBuffer(gl.ARRAY_BUFFER, attributeItem.buffer);
+              _gl.bindBuffer(gl.ARRAY_BUFFER, attributeItem.buffer._glbuffer);
               enableAttribute(attributePointer);
               _gl.vertexAttribPointer(attributePointer, attributeSize, gl.FLOAT, false, 0, 0);
 
@@ -2825,7 +2825,7 @@ class WebGLRenderer implements Renderer {
     WebGLMaterial material;
     
     if ((object as dynamic).geometry is BufferGeometry) {
-      setDirectBuffers(geometry, gl.DYNAMIC_DRAW, !(object as dynamic).geometry.isDynamic);
+        setDirectBuffers(geometry, gl.DYNAMIC_DRAW, true);
     } else if (object is Mesh) {
       // check all geometry groups
     

@@ -39,8 +39,6 @@ void imaterialBug() {
 }
 
 void pointLightBug() {
-  // Test failed: Caught type 'ParticleSystemMaterial' is not a
-  // subtype of type 'ITextureMaterial' in type cast.
   WebGLRenderer renderer = new WebGLRenderer()..setSize(window.innerWidth,
       window.innerHeight);
 
@@ -58,9 +56,24 @@ void pointLightBug() {
   renderer.render(scene, camera);
 }
 
+void meshHelperBug() {
+  WebGLRenderer renderer = new WebGLRenderer()..setSize(window.innerWidth,
+      window.innerHeight);
+
+  OrthographicCamera camera = new OrthographicCamera(-10.0, -10.0, 10.0, 10.0,
+      0.1, 1.0);
+  Scene scene = new Scene();
+  Mesh sphere = new Mesh(new SphereGeometry(40.0, 10, 10),
+      new MeshLambertMaterial(color: 0xaa00aa));
+
+  scene.add(new WireframeHelper(sphere));
+  renderer.render(scene, camera);
+}
+
 void main() {
   test("typed array bug", typed);
   test("imaterial bug", imaterialBug);
   test("point light array size bug", pointLightBug);
+  test("buggy meshhelper", meshHelperBug);
   var g = new Geometry();
 }

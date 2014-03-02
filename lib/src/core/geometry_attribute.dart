@@ -18,8 +18,8 @@ class GeometryAttribute<T> {
   GeometryAttribute._internal(this.numItems, this.itemSize, this.array);
 
   factory GeometryAttribute.float32(int numItems, [int itemSize = 1]) =>
-      new GeometryAttribute<Float32List>._internal(numItems, itemSize, new Float32List(numItems));
+      new GeometryAttribute<Float32List>._internal(numItems, itemSize, new Float32List(numItems * itemSize));
 
   factory GeometryAttribute.int16(int numItems, [int itemSize = 1]) =>
-      new GeometryAttribute<Int16List>._internal(numItems, itemSize, new Int16List(numItems));
+      new GeometryAttribute<Int16List>._internal(numItems, itemSize, new Int16List(numItems * itemSize));
 }

@@ -33,7 +33,7 @@ class WebGLObject {
     return object["__webglObject"];
   }
 
-  Geometry get geometry => _hasGeometry ? (object as dynamic).geometry : null;
+  get geometry => _hasGeometry ? (object as dynamic).geometry : null;
   WebGLGeometry get webglgeometry => geometry != null ? new WebGLGeometry.from(geometry) : null;
 
   Material get material => (object as dynamic).material;
