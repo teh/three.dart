@@ -94,7 +94,7 @@ class WebGLMaterial {
   Vector3 get wrapRGB => _hasWrapRGB ? (_material as dynamic).wrapRGB : null;
 
   get fog => _hasFog ? (_material as dynamic).fog : false;
-  get shading => (_material as dynamic).shading;
+  get shading => (_material is LineBasicMaterial ? null : (_material as dynamic).shading);
   
   Texture get map => isITextureMaterial || isParticleSystemMaterial ? (_material as dynamic).map : null;
   Texture get envMap => isITextureMaterial ? (_material as ITextureMaterial).envMap : null;

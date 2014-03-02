@@ -70,10 +70,26 @@ void meshHelperBug() {
   renderer.render(scene, camera);
 }
 
+void lineMaterialBug() {
+  WebGLRenderer renderer = new WebGLRenderer()..setSize(window.innerWidth,
+      window.innerHeight);
+
+  OrthographicCamera camera = new OrthographicCamera(-10.0, -10.0, 10.0, 10.0,
+      0.1, 1.0);
+  Scene scene = new Scene();
+  Mesh box = new Mesh(new CubeGeometry(40.0, 10.0, 10.0),
+      new LineBasicMaterial(color: 0xaa00aa));
+
+  scene.add(box);
+  renderer.render(scene, camera);
+}
+
+
 void main() {
   test("typed array bug", typed);
   test("imaterial bug", imaterialBug);
   test("point light array size bug", pointLightBug);
   test("buggy meshhelper", meshHelperBug);
+  test("line material bug", lineMaterialBug);
   var g = new Geometry();
 }
