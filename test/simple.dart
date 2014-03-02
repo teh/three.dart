@@ -38,8 +38,29 @@ void imaterialBug() {
   renderer.render(scene, camera);
 }
 
+void pointLightBug() {
+  // Test failed: Caught type 'ParticleSystemMaterial' is not a
+  // subtype of type 'ITextureMaterial' in type cast.
+  WebGLRenderer renderer = new WebGLRenderer()..setSize(window.innerWidth,
+      window.innerHeight);
+
+  OrthographicCamera camera = new OrthographicCamera(-10.0, -10.0, 10.0, 10.0,
+      0.1, 1.0);
+  Scene scene = new Scene();
+  Mesh sphere = new Mesh(new SphereGeometry(40.0, 10, 10),
+      new MeshLambertMaterial(color: 0xaa00aa));
+  scene.add(sphere);
+
+  PointLight pl = new PointLight(0xffffff, .8, 100.0);
+  pl.position = new Vector3(10.0, 20.0, -100.0);
+  scene.add(pl);
+
+  renderer.render(scene, camera);
+}
+
 void main() {
   test("typed array bug", typed);
   test("imaterial bug", imaterialBug);
+  test("point light array size bug", pointLightBug);
   var g = new Geometry();
 }

@@ -3629,7 +3629,7 @@ class WebGLRenderer implements Renderer {
         // Grow the lists
         pointColors.length = pointOffset + 3;
         pointPositions.length = pointOffset + 3;
-        pointDistances.length = pointLength + lights.length - 1;
+        pointDistances.length = pointLength + lights.length;
 
         if (gammaInput) {
           setColorGamma(pointColors, pointOffset, color, intensity * intensity);
