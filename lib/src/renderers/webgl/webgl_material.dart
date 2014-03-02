@@ -1,6 +1,6 @@
 part of three;
 
-class WebGLMaterial { // implements Material {
+class WebGLMaterial {
   Material _material;
 
   var program;
@@ -96,7 +96,7 @@ class WebGLMaterial { // implements Material {
   get fog => _hasFog ? (_material as dynamic).fog : false;
   get shading => (_material as dynamic).shading;
   
-  Texture get map => isITextureMaterial || isParticleSystemMaterial ? (_material as ITextureMaterial).map : null;
+  Texture get map => isITextureMaterial || isParticleSystemMaterial ? (_material as dynamic).map : null;
   Texture get envMap => isITextureMaterial ? (_material as ITextureMaterial).envMap : null;
   Texture get lightMap => isITextureMaterial ? (_material as ITextureMaterial).lightMap : null;
   Texture get specularMap => isITextureMaterial ? (_material as ITextureMaterial).specularMap : null;
